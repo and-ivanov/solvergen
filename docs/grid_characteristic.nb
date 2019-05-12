@@ -1,0 +1,199 @@
+Notebook[{Cell[
+CellGroupData[{Cell[
+BoxData[RowBox[{"A1"," ","="," ",RowBox[{"{",RowBox[
+{RowBox[{"{",RowBox[{"0",",","0",",",RowBox[{"1","/","r"}],",","0",",","0"}],"}"}],","," ",RowBox[
+{"{",RowBox[{"0",",","0",",","0",",","0",",",RowBox[{"1","/","r"}]}],"}"}],","," ",RowBox[
+{"{",RowBox[{RowBox[{"l","+",RowBox[{"2","m"}]}],",","0",",","0",",","0",",","0"}],"}"}],",",RowBox[
+{"{",RowBox[{"l",",","0",",","0",",","0",",","0"}],"}"}],",",RowBox[{"{",RowBox[{"0",",","m",",","0",",","0",",","0"}],"}"}]}],"}"}]," "}]],
+"Input",ExpressionUUID -> "36dbaaaa-e9c9-4f1f-9105-12b32d8da7d3",CellLabel -> "In[86]:= "],Cell[
+BoxData[
+RowBox[{"{",RowBox[{RowBox[{"{",RowBox[{"0",",","0",",",FractionBox["1","r"],",","0",",","0"}],"}"}],",",RowBox[
+{"{",RowBox[{"0",",","0",",","0",",","0",",",FractionBox["1","r"]}],"}"}],",",RowBox[
+{"{",RowBox[{RowBox[{"l","+",RowBox[{"2"," ","m"}]}],",","0",",","0",",","0",",","0"}],"}"}],",",RowBox[
+{"{",RowBox[{"l",",","0",",","0",",","0",",","0"}],"}"}],",",RowBox[{"{",RowBox[{"0",",","m",",","0",",","0",",","0"}],"}"}]}],"}"}],
+StandardForm],"Output",ExpressionUUID -> "9252698d-18a7-4e2e-82cf-8faed3874899",CellLabel -> "Out[86]= "]},
+Open],ExpressionUUID -> "55681a4c-bf69-4c19-9a1c-943e827ec420"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"A2"," ","="," ",RowBox[{"{",RowBox[{RowBox[{"{",RowBox[{"0",",","0",",","0",",","0",",",RowBox[
+{"1","/","r"}]}],"}"}],",",RowBox[{"{",RowBox[{"0",",","0",",","0",",",RowBox[{"1","/","r"}],",","0"}],"}"}],",",RowBox[
+{"{",RowBox[{"0",",","l",",","0",",","0",",","0"}],"}"}],",",RowBox[{"{",RowBox[{"0",",",RowBox[
+{"l","+",RowBox[{"2","m"}]}],",","0",",","0",",","0"}],"}"}],",",RowBox[{"{",RowBox[
+{"m",",","0",",","0",",","0",",","0"}],"}"}]}],"}"}]}]],"Input",ExpressionUUID -> "4e944bcc-8ed1-4a2a-9639-a87f51634b9b",
+CellLabel -> "In[87]:= "],Cell[
+BoxData[RowBox[{"{",RowBox[{RowBox[{"{",RowBox[{"0",",","0",",","0",",","0",",",FractionBox[
+"1","r"]}],"}"}],",",RowBox[{"{",RowBox[{"0",",","0",",","0",",",FractionBox["1",
+"r"],",","0"}],"}"}],",",RowBox[{"{",RowBox[{"0",",","l",",","0",",","0",",","0"}],"}"}],",",RowBox[
+{"{",RowBox[{"0",",",RowBox[{"l","+",RowBox[{"2"," ","m"}]}],",","0",",","0",",","0"}],"}"}],",",RowBox[
+{"{",RowBox[{"m",",","0",",","0",",","0",",","0"}],"}"}]}],"}"}],StandardForm],"Output",
+ExpressionUUID -> "c8e3a534-984c-4d2f-b039-74eb72961b00",CellLabel -> "Out[87]= "]},
+Open],ExpressionUUID -> "e164bc37-cb45-4423-8c07-a7f38026cd03"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"ev1","=",RowBox[{"Reverse","[",RowBox[{"Eigenvalues","[","A1","]"}],"]"}]}]],
+"Input",ExpressionUUID -> "02730162-5cb4-4484-8cd0-e6737987e6ff",NumberMarks -> False,
+CellLabel -> "In[88]:= "],Cell[
+BoxData[RowBox[{"{",RowBox[{FractionBox[SqrtBox[RowBox[
+{"l","+",RowBox[{"2"," ","m"}]}]],SqrtBox["r"]],",",RowBox[{"-",FractionBox[SqrtBox[
+RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],SqrtBox["r"]]}],",",FractionBox[SqrtBox[
+"m"],SqrtBox["r"]],",",RowBox[{"-",FractionBox[SqrtBox["m"],SqrtBox["r"]]}],",","0"}],"}"}],
+StandardForm],"Output",ExpressionUUID -> "f6c04087-986f-4858-8f7b-cbe5a2ade321",CellLabel -> "Out[88]= "]},
+Open],ExpressionUUID -> "3a4d359f-0303-4dac-8e1a-ff5fce472ec4"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"ev2","=",RowBox[{"Reverse","[",RowBox[{"Eigenvalues","[","A2","]"}],"]"}]}]],
+"Input",ExpressionUUID -> "3fc4e7c0-4323-4d04-9575-b65a9f28f143",CellLabel -> "In[89]:= "],Cell[
+BoxData[
+RowBox[{"{",RowBox[{FractionBox[SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],
+SqrtBox["r"]],",",RowBox[{"-",FractionBox[SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],
+SqrtBox["r"]]}],",",FractionBox[SqrtBox["m"],SqrtBox["r"]],",",RowBox[{"-",FractionBox[
+SqrtBox["m"],SqrtBox["r"]]}],",","0"}],"}"}],StandardForm],"Output",ExpressionUUID -> "c452aa5e-88a2-4ec7-956f-31aae86f9925",
+CellLabel -> "Out[89]= "]},Open],ExpressionUUID -> "df1414fa-0c67-46dc-9a8b-c3989e93735a"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"L1T"," ","="," ",RowBox[{"Reverse","[",RowBox[{"Eigenvectors","[","A1","]"}],"]"}]}],";"}],"\n",RowBox[
+{RowBox[{RowBox[{"L1T","[",RowBox[{"[","1","]"}],"]"}]," ","*="," ","l"}],";"}],"\n",RowBox[
+{RowBox[{RowBox[{"L1T","[",RowBox[{"[","2","]"}],"]"}]," ","*="," ","l"}],";"}],"\n",RowBox[
+{RowBox[{RowBox[{"L1T","[",RowBox[{"[","3","]"}],"]"}]," ","*="," ","m"}],";"}],"\n",RowBox[
+{RowBox[{RowBox[{"L1T","[",RowBox[{"[","4","]"}],"]"}]," ","*="," ","m"}],";"}],"\n",RowBox[
+{"L1T"," ","="," ",RowBox[{"FullSimplify","[","L1T","]"}]}],"\n",RowBox[{RowBox[{"L1"," ","=",RowBox[
+{"Transpose","[","L1T","]"}]}],";"}]}],"Input",ExpressionUUID -> "26fe5ce8-299a-4572-aff5-7ed0f0dd13b5",
+CellLabel -> "In[90]:= "],Cell[
+BoxData[RowBox[{"{",RowBox[{RowBox[{"{",RowBox[{FractionBox[
+SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],SqrtBox["r"]],",","0",",",RowBox[
+{"l","+",RowBox[{"2"," ","m"}]}],",","l",",","0"}],"}"}],",",RowBox[{"{",RowBox[{RowBox[
+{"-",FractionBox[SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],SqrtBox["r"]]}],",","0",",",RowBox[
+{"l","+",RowBox[{"2"," ","m"}]}],",","l",",","0"}],"}"}],",",RowBox[{"{",RowBox[{"0",",",FractionBox[
+SqrtBox["m"],SqrtBox["r"]],",","0",",","0",",","m"}],"}"}],",",RowBox[{"{",RowBox[
+{"0",",",RowBox[{"-",FractionBox[SqrtBox["m"],SqrtBox["r"]]}],",","0",",","0",",","m"}],"}"}],",",RowBox[
+{"{",RowBox[{"0",",","0",",","0",",","1",",","0"}],"}"}]}],"}"}],StandardForm],"Output",
+ExpressionUUID -> "c2155a3e-f1f2-49fb-8bcb-c606676fd4a5",CellLabel -> "Out[95]= "]},
+Open],ExpressionUUID -> "e065cf22-d595-41b6-9d9c-5cd2aec2c5ba"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"L2T"," ","="," ",RowBox[{"Reverse","[",RowBox[{"Eigenvectors","[","A2","]"}],"]"}]}],";"}],"\n",RowBox[
+{RowBox[{RowBox[{"L2T","[",RowBox[{"[","1","]"}],"]"}]," ","*="," ",RowBox[{"l","+",RowBox[
+{"2","m"}]}]}],";"}],"\n",RowBox[{RowBox[{RowBox[{"L2T","[",RowBox[{"[","2","]"}],"]"}]," ","*="," ",RowBox[
+{"l","+",RowBox[{"2","m"}]}]}],";"}],"\n",RowBox[{RowBox[{RowBox[{"L2T","[",RowBox[
+{"[","3","]"}],"]"}]," ","*="," ","m"}],";"}],"\n",RowBox[{RowBox[{RowBox[{"L2T","[",RowBox[
+{"[","4","]"}],"]"}]," ","*="," ","m"}],";"}],"\n",RowBox[{"L2T"," ","="," ",RowBox[
+{"FullSimplify","[","L2T","]"}]}],"\n",RowBox[{RowBox[{"L2"," ","=",RowBox[{"Transpose","[","L2T","]"}]}],";"}]}],
+"Input",ExpressionUUID -> "68e83bf9-48bd-4063-bb79-339d68aba0bd",CellLabel -> "In[97]:= "],Cell[
+BoxData[
+RowBox[{"{",RowBox[{RowBox[{"{",RowBox[{"0",",",FractionBox[SqrtBox[RowBox[{"l","+",RowBox[
+{"2"," ","m"}]}]],SqrtBox["r"]],",","l",",",RowBox[{"l","+",RowBox[{"2"," ","m"}]}],",","0"}],"}"}],",",RowBox[
+{"{",RowBox[{"0",",",RowBox[{"-",FractionBox[SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],
+SqrtBox["r"]]}],",","l",",",RowBox[{"l","+",RowBox[{"2"," ","m"}]}],",","0"}],"}"}],",",RowBox[
+{"{",RowBox[{FractionBox[SqrtBox["m"],SqrtBox["r"]],",","0",",","0",",","0",",","m"}],"}"}],",",RowBox[
+{"{",RowBox[{RowBox[{"-",FractionBox[SqrtBox["m"],SqrtBox["r"]]}],",","0",",","0",",","0",",","m"}],"}"}],",",RowBox[
+{"{",RowBox[{"0",",","0",",","1",",","0",",","0"}],"}"}]}],"}"}],StandardForm],"Output",
+ExpressionUUID -> "88100248-2b13-4a33-8de2-d9ce476a3b3a",CellLabel -> "Out[102]= "]},
+Open],ExpressionUUID -> "4a46d64d-c340-42df-adc0-16ddcbb66793"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"R1","=",RowBox[{"FullSimplify","[",RowBox[{"Inverse","[","L1","]"}],"]"}]}]],
+"Input",ExpressionUUID -> "e3388197-6f6e-46aa-ab63-1230c7e31002",CellLabel -> "In[104]:= "],Cell[
+BoxData[
+RowBox[{"{",RowBox[{RowBox[{"{",RowBox[{FractionBox[SqrtBox["r"],RowBox[{"2"," ",SqrtBox[
+RowBox[{"l","+",RowBox[{"2"," ","m"}]}]]}]],",","0",",",FractionBox["1",RowBox[{RowBox[
+{"2"," ","l"}],"+",RowBox[{"4"," ","m"}]}]],",","0",",","0"}],"}"}],",",RowBox[{"{",RowBox[
+{RowBox[{"-",FractionBox[SqrtBox["r"],RowBox[{"2"," ",SqrtBox[RowBox[{"l","+",RowBox[
+{"2"," ","m"}]}]]}]]}],",","0",",",FractionBox["1",RowBox[{RowBox[{"2"," ","l"}],"+",RowBox[
+{"4"," ","m"}]}]],",","0",",","0"}],"}"}],",",RowBox[{"{",RowBox[{"0",",",FractionBox[
+SqrtBox["r"],RowBox[{"2"," ",SqrtBox["m"]}]],",","0",",","0",",",FractionBox["1",
+RowBox[{"2"," ","m"}]]}],"}"}],",",RowBox[{"{",RowBox[{"0",",",RowBox[{"-",FractionBox[
+SqrtBox["r"],RowBox[{"2"," ",SqrtBox["m"]}]]}],",","0",",","0",",",FractionBox["1",
+RowBox[{"2"," ","m"}]]}],"}"}],",",RowBox[{"{",RowBox[{"0",",","0",",",RowBox[{"-",FractionBox[
+"l",RowBox[{"l","+",RowBox[{"2"," ","m"}]}]]}],",","1",",","0"}],"}"}]}],"}"}],StandardForm],
+"Output",ExpressionUUID -> "6dea2c15-2d14-43f6-9299-c4429e2ef6a6",CellLabel -> "Out[104]= "]},
+Open],ExpressionUUID -> "18f44929-42bb-4563-87af-b6725a15c03e"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"R2","=",RowBox[{"FullSimplify","[",RowBox[{"Inverse","[","L2","]"}],"]"}]}]],
+"Input",ExpressionUUID -> "ee85ac1b-010f-4819-b7df-a041d3e795ec",CellLabel -> "In[105]:= "],Cell[
+BoxData[
+RowBox[{"{",RowBox[{RowBox[{"{",RowBox[{"0",",",FractionBox[SqrtBox["r"],RowBox[{"2"," ",SqrtBox[
+RowBox[{"l","+",RowBox[{"2"," ","m"}]}]]}]],",","0",",",FractionBox["1",RowBox[{RowBox[
+{"2"," ","l"}],"+",RowBox[{"4"," ","m"}]}]],",","0"}],"}"}],",",RowBox[{"{",RowBox[
+{"0",",",RowBox[{"-",FractionBox[SqrtBox["r"],RowBox[{"2"," ",SqrtBox[RowBox[{"l","+",RowBox[
+{"2"," ","m"}]}]]}]]}],",","0",",",FractionBox["1",RowBox[{RowBox[{"2"," ","l"}],"+",RowBox[
+{"4"," ","m"}]}]],",","0"}],"}"}],",",RowBox[{"{",RowBox[{FractionBox[SqrtBox["r"],
+RowBox[{"2"," ",SqrtBox["m"]}]],",","0",",","0",",","0",",",FractionBox["1",RowBox[
+{"2"," ","m"}]]}],"}"}],",",RowBox[{"{",RowBox[{RowBox[{"-",FractionBox[SqrtBox["r"],
+RowBox[{"2"," ",SqrtBox["m"]}]]}],",","0",",","0",",","0",",",FractionBox["1",RowBox[
+{"2"," ","m"}]]}],"}"}],",",RowBox[{"{",RowBox[{"0",",","0",",","1",",",RowBox[{"-",FractionBox[
+"l",RowBox[{"l","+",RowBox[{"2"," ","m"}]}]]}],",","0"}],"}"}]}],"}"}],StandardForm],
+"Output",ExpressionUUID -> "ac6508a7-2613-4230-86ca-d3d65bcaeef7",CellLabel -> "Out[105]= "]},
+Open],ExpressionUUID -> "89553ce9-5a7c-4dcc-827f-9c82742fbadf"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"MatrixForm","[","L1","]"}]],"Input",ExpressionUUID -> "1c006ab1-9c97-4e3b-9cdb-f7a87e5cf863",
+CellLabel -> "In[106]:= "],Cell[
+BoxData[TagBox[RowBox[{"(","\[NoBreak]",GridBox[
+{{FractionBox[SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],SqrtBox["r"]],RowBox[
+{"-",FractionBox[SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],SqrtBox["r"]]}],"0","0","0"},{"0","0",FractionBox[
+SqrtBox["m"],SqrtBox["r"]],RowBox[{"-",FractionBox[SqrtBox["m"],SqrtBox["r"]]}],"0"},{RowBox[
+{"l","+",RowBox[{"2"," ","m"}]}],RowBox[{"l","+",RowBox[{"2"," ","m"}]}],"0","0","0"},{"l","l","0","0","1"},{"0","0","m","m","0"}},
+RowSpacings -> 1,ColumnSpacings -> 1,RowAlignments -> Baseline,ColumnAlignments -> Center],"\[NoBreak]",")"}],
+Function[BoxForm`e$,MatrixForm[BoxForm`e$]]],StandardForm],"Output",ExpressionUUID -> "e625ccc4-9528-477f-ae80-4c1fc4bc20f3",
+CellLabel -> "Out[106]//MatrixForm= "]},Open],ExpressionUUID -> "5438ece0-e46c-4f0a-b016-63c4386f4e46"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"MatrixForm","[","L2","]"}]],"Input",ExpressionUUID -> "afd5c147-8f47-42b7-9457-9a90be144ecc",
+CellLabel -> "In[107]:= "],Cell[
+BoxData[TagBox[RowBox[{"(","\[NoBreak]",GridBox[
+{{"0","0",FractionBox[SqrtBox["m"],SqrtBox["r"]],RowBox[{"-",FractionBox[SqrtBox[
+"m"],SqrtBox["r"]]}],"0"},{FractionBox[SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],
+SqrtBox["r"]],RowBox[{"-",FractionBox[SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]],
+SqrtBox["r"]]}],"0","0","0"},{"l","l","0","0","1"},{RowBox[{"l","+",RowBox[{"2"," ","m"}]}],RowBox[
+{"l","+",RowBox[{"2"," ","m"}]}],"0","0","0"},{"0","0","m","m","0"}},RowSpacings -> 1,
+ColumnSpacings -> 1,RowAlignments -> Baseline,ColumnAlignments -> Center],"\[NoBreak]",")"}],
+Function[BoxForm`e$,MatrixForm[BoxForm`e$]]],StandardForm],"Output",ExpressionUUID -> "494bc673-1b2b-491d-b55e-86de46bfbd3d",
+CellLabel -> "Out[107]//MatrixForm= "]},Open],ExpressionUUID -> "750fc2cf-3b76-4368-ac0d-4aecef93158f"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"MatrixForm","[","R1","]"}]],"Input",ExpressionUUID -> "35e8d0cb-331d-4805-b340-f24f72437c9d",
+CellLabel -> "In[108]:= "],Cell[
+BoxData[TagBox[RowBox[{"(","\[NoBreak]",GridBox[
+{{FractionBox[SqrtBox["r"],RowBox[{"2"," ",SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]]}]],"0",FractionBox[
+"1",RowBox[{RowBox[{"2"," ","l"}],"+",RowBox[{"4"," ","m"}]}]],"0","0"},{RowBox[{"-",FractionBox[
+SqrtBox["r"],RowBox[{"2"," ",SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]]}]]}],"0",FractionBox[
+"1",RowBox[{RowBox[{"2"," ","l"}],"+",RowBox[{"4"," ","m"}]}]],"0","0"},{"0",FractionBox[
+SqrtBox["r"],RowBox[{"2"," ",SqrtBox["m"]}]],"0","0",FractionBox["1",RowBox[{"2"," ","m"}]]},{"0",RowBox[
+{"-",FractionBox[SqrtBox["r"],RowBox[{"2"," ",SqrtBox["m"]}]]}],"0","0",FractionBox[
+"1",RowBox[{"2"," ","m"}]]},{"0","0",RowBox[{"-",FractionBox["l",RowBox[{"l","+",RowBox[
+{"2"," ","m"}]}]]}],"1","0"}},RowSpacings -> 1,ColumnSpacings -> 1,RowAlignments -> Baseline,
+ColumnAlignments -> Center],"\[NoBreak]",")"}],Function[BoxForm`e$,MatrixForm[BoxForm`e$]]],
+StandardForm],"Output",ExpressionUUID -> "b1dab5be-c1dc-4a94-a625-f8b3561887bd",CellLabel -> "Out[108]//MatrixForm= "]},
+Open],ExpressionUUID -> "272134a3-ab45-4214-8357-1e2eff25b48d"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"MatrixForm","[","R2","]"}]],"Input",ExpressionUUID -> "61e89403-32b1-4675-93cf-d1a30b8ee2d4",
+CellLabel -> "In[109]:= "],Cell[
+BoxData[TagBox[RowBox[{"(","\[NoBreak]",GridBox[
+{{"0",FractionBox[SqrtBox["r"],RowBox[{"2"," ",SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]]}]],"0",FractionBox[
+"1",RowBox[{RowBox[{"2"," ","l"}],"+",RowBox[{"4"," ","m"}]}]],"0"},{"0",RowBox[{"-",FractionBox[
+SqrtBox["r"],RowBox[{"2"," ",SqrtBox[RowBox[{"l","+",RowBox[{"2"," ","m"}]}]]}]]}],"0",FractionBox[
+"1",RowBox[{RowBox[{"2"," ","l"}],"+",RowBox[{"4"," ","m"}]}]],"0"},{FractionBox[
+SqrtBox["r"],RowBox[{"2"," ",SqrtBox["m"]}]],"0","0","0",FractionBox["1",RowBox[{"2"," ","m"}]]},{RowBox[
+{"-",FractionBox[SqrtBox["r"],RowBox[{"2"," ",SqrtBox["m"]}]]}],"0","0","0",FractionBox[
+"1",RowBox[{"2"," ","m"}]]},{"0","0","1",RowBox[{"-",FractionBox["l",RowBox[{"l","+",RowBox[
+{"2"," ","m"}]}]]}],"0"}},RowSpacings -> 1,ColumnSpacings -> 1,RowAlignments -> Baseline,
+ColumnAlignments -> Center],"\[NoBreak]",")"}],Function[BoxForm`e$,MatrixForm[BoxForm`e$]]],
+StandardForm],"Output",ExpressionUUID -> "69a7f980-0212-4f57-9c55-3928faf01946",CellLabel -> "Out[109]//MatrixForm= "]},
+Open],ExpressionUUID -> "e79c50ca-aa8b-4e9e-9fcd-f5d847a374bf"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"FullSimplify","[",RowBox[{"A1","==",RowBox[{"L1",".",RowBox[
+{"DiagonalMatrix","[","ev1","]"}],".","R1"}]}],"]"}]],"Input",ExpressionUUID -> "8be8742f-a09a-44f1-be86-5f9834fa56e2",
+CellLabel -> "In[110]:= "],Cell[
+BoxData["True",StandardForm],"Output",ExpressionUUID -> "974b0929-1e13-4afa-8e8d-49bbebf31468",
+CellLabel -> "Out[110]= "]},Open],ExpressionUUID -> "8ff91d1c-1269-4247-a271-5a8e0439acf5"],Cell[
+CellGroupData[
+{Cell[
+BoxData[RowBox[{"FullSimplify","[",RowBox[{"A2","==",RowBox[{"L2",".",RowBox[
+{"DiagonalMatrix","[","ev2","]"}],".","R2"}]}],"]"}]],"Input",ExpressionUUID -> "d410ad8b-db74-4af5-b1c1-b259f8812d83",
+CellLabel -> "In[111]:= "],Cell[
+BoxData["True",StandardForm],"Output",ExpressionUUID -> "325d950d-8748-4b23-9e3c-95fe6c11e4d9",
+CellLabel -> "Out[111]= "]},Open],ExpressionUUID -> "4d92546b-a06d-44b0-a2a7-202b77f64979"]},
+StyleDefinitions -> "Default.nb",FrontEndVersion -> "12. for Wolfram Cloud 1.49.1 (April 10, 2019)"]
