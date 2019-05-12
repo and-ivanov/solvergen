@@ -47,6 +47,8 @@ function(add_llvm)
 	set(CMAKE_BUILD_TYPE Release)
 	set(LLVM_ENABLE_RTTI ON) # otherwise it is impossible to inherit from llvm classess
 	set(BUILD_SHARED_LIBS ON) # enables shared shibraries to link with
+	set(LLVM_LINK_LLVM_DYLIB ON)
+	set(LLVM_LINK_LLVM_DYLIB ON)
 	add_subdirectory(${llvm_SOURCE_DIR} ${llvm_BINARY_DIR} EXCLUDE_FROM_ALL)
 endfunction()
 
@@ -69,8 +71,7 @@ target_include_directories(solver_generator PRIVATE
 add_dependencies(solver_generator clang-headers)
 
 target_link_libraries(solver_generator PRIVATE
-    LLVMOption
-    LLVMSupport
+    LLVM
     clangAST
     clangASTMatchers
     clangBasic
