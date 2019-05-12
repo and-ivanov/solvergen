@@ -35,24 +35,21 @@ if(NOT clang_POPULATED)
     FetchContent_Populate(clang)
 endif()
 
-#set(LLVM_TARGETS_TO_BUILD X86)
-#set(BUILD_SHARED_LIBS ON)
-
-#set(LLVM_ENABLE_PROJECTS clang)
-#set(LLVM_TOOL_CLANG_BUILD ON)
-
-
 
 function(add_llvm)
 	set(CMAKE_BUILD_TYPE Release)
+	message("INSIDE:" ${CMAKE_BUILD_TYPE})
 	set(LLVM_ENABLE_RTTI ON) # otherwise it is impossible to inherit from llvm classess
 	set(BUILD_SHARED_LIBS ON) # enables shared shibraries to link with
-	set(LLVM_LINK_LLVM_DYLIB ON)
-	set(LLVM_LINK_LLVM_DYLIB ON)
+	#set(LLVM_LINK_LLVM_DYLIB ON)
+	#set(LLVM_BUILD_LLVM_DYLIB ON)
 	add_subdirectory(${llvm_SOURCE_DIR} ${llvm_BINARY_DIR} EXCLUDE_FROM_ALL)
+	#add_subdirectory(${llvm_SOURCE_DIR} ${llvm_BINARY_DIR})
 endfunction()
 
+message("BEFORE:" ${CMAKE_BUILD_TYPE})
 add_llvm()
+message("AFTER:" ${CMAKE_BUILD_TYPE})
 
 # create compilation database (compile_commands.json) to process later
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -71,7 +68,8 @@ target_include_directories(solver_generator PRIVATE
 add_dependencies(solver_generator clang-headers)
 
 target_link_libraries(solver_generator PRIVATE
-    LLVM
+    LLVMOption
+    LLVMSupport
     clangAST
     clangASTMatchers
     clangBasic
