@@ -3,8 +3,8 @@
 set -x
 set -e
 
-nx=200
-ny=200
+nx=2000
+ny=2000
 dx=1
 dy=1
 
@@ -14,15 +14,15 @@ rm -f bins/*
 cat >config.hrdata <<EOF
 {
   nx: $nx
-  ny: $ny 
+  ny: $ny
   time_steps: 100
-  dx: $dx 
-  dy: $dy 
+  dx: $dx
+  dy: $dy
   time_step: 0.3
   cp: cp.bin
   cs: cs.bin
   rho: rho.bin
-	save_rate: 1
+	save_rate: 100
 	save_path: bins
 	initial_pressure: initial_pressure.bin
 }
@@ -47,4 +47,4 @@ data.astype('<f8').tofile("initial_pressure.bin")
 EOF
 python gen_initial.py
 
-./gc_elastic_2d config.hrdata
+/usr/bin/time -f "time: %e" ./gc_elastic_2d config.hrdata
