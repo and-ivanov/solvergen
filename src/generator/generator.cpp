@@ -26,7 +26,9 @@ public:
     }
 
     bool TraverseStmt(Stmt* e) {
-        if (cast<Expr>(e) && cast<Expr>(e)->getType().getAsString() == "struct Var") {
+        if (e && isa<Expr>(e) &&
+                cast<Expr>(e)->getType().getAsString() == "struct Var")
+        {
             mRewriter.InsertTextAfterToken(e->getEndLoc(), ".val(_i, _j)");
 
             {
@@ -88,16 +90,20 @@ public:
         return true;
     }
 
-    bool VisitExprWithCleanups(ExprWithCleanups* exprWithCleanups) {
-        if (exprWithCleanups->getType().getAsString() == "struct Sequence" ||
-            exprWithCleanups->getType().getAsString() == "struct Assign")
+    bool TraverseStmt(Stmt* e) {
+        if (e && isa<Expr>(e) &&
+                (cast<Expr>(e)->getType().getAsString() == "struct Sequence" ||
+                 cast<Expr>(e)->getType().getAsString() == "struct Assign"))
         {
-            SourceLocation begin = exprWithCleanups->getBeginLoc();
-            SourceLocation end = exprWithCleanups->getEndLoc();
+            Expr* expr = cast<Expr>(e);
+            assert(expr);
+
+            SourceLocation begin = expr->getBeginLoc();
+            SourceLocation end = expr->getEndLoc();
 
             // add assertions
             SequenceVisitor sv(mRewriter);
-            sv.TraverseStmt(exprWithCleanups);
+            sv.TraverseStmt(expr);
 
             if (sv.vars.empty()) {
                 mRewriter.InsertText(begin, "!!! ``` !!!", true, true);
@@ -125,9 +131,11 @@ public:
             end = end.getLocWithOffset(endOffset);
 
             mRewriter.InsertText(end, "\n}\n}\n}", true, true);
-        }
 
-        return true;
+            return true;
+        } else {
+            return RecursiveASTVisitor<MyASTVisitor>::TraverseStmt(e);
+        }
     }
 
 private:

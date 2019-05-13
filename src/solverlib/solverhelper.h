@@ -9,6 +9,10 @@
 #include <iomanip>
 #include <cassert>
 
+#ifndef NDEBUG
+#include <fenv.h>
+#endif
+
 using Int = int64_t;
 using Real = double;
 
