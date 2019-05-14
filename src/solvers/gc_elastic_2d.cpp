@@ -81,185 +81,144 @@ int main(int argc, char** argv) {
 
     auto size = Size(gnx, gny);
 
-    Array vx_v(size), vy_v(size), sxx_v(size), syy_v(size), sxy_v(size);
+    // last letter a denotes entire Array
+    // last letter i of Var denotes inner area of Array without ghost
+
+    Array vxa(size), vya(size), sxxa(size), syya(size), sxya(size);
 
 
-    Array cp_v(size), cs_v(size), rho_v(size), la_v(size), mu_v(size), lm_v(size);
-    Array icp_v(size), ics_v(size), ila_v(size), imu_v(size), ilm_v(size);
+    Array cpa(size), csa(size), rhoa(size), laa(size), mua(size), lma(size);
+    Array icpa(size), icsa(size), ilaa(size), imua(size), ilma(size);
 
-    Array w1_v(size), w2_v(size), w3_v(size), w4_v(size);
+    Array w1a(size), w2a(size), w3a(size), w4a(size);
 
-    auto w1 = Var(w1_v, inside);
-    auto w2 = Var(w2_v, inside);
-    auto w3 = Var(w3_v, inside);
-    auto w4 = Var(w4_v, inside);
+    Var w1i(w1a, inside);
+    Var w2i(w2a, inside);
+    Var w3i(w3a, inside);
+    Var w4i(w4a, inside);
 
-    auto vx = Var(vx_v, inside);
-    auto vy = Var(vy_v, inside);
-    auto sxx = Var(sxx_v, inside);
-    auto syy = Var(syy_v, inside);
-    auto sxy = Var(sxy_v, inside);
+    Var vxi(vxa, inside);
+    Var vyi(vya, inside);
+    Var sxxi(sxxa, inside);
+    Var syyi(syya, inside);
+    Var sxyi(sxya, inside);
 
-    auto cp = Var(cp_v, inside);
-    auto cs = Var(cs_v, inside);
-    auto rho = Var(rho_v, inside);
-    auto la = Var(la_v, inside);
-    auto mu = Var(mu_v, inside);
-    auto lm = Var(lm_v, inside);
+    Var cpi(cpa, inside);
+    Var csi(csa, inside);
+    Var rhoi(rhoa, inside);
+    Var lai(laa, inside);
+    Var mui(mua, inside);
+    Var lmi(lma, inside);
 
-    auto icp = Var(icp_v, inside);
-    auto ics = Var(ics_v, inside);
-    auto imu = Var(imu_v, inside);
-    auto ilm = Var(ilm_v, inside);
+    Var icpi(icpa, inside);
+    Var icsi(icsa, inside);
+    Var imui(imua, inside);
+    Var ilmi(ilma, inside);
 
     {
-        auto p_v = Array(nx, ny).load(conf["initial_pressure"].as<std::string>());
-        Var p(p_v);
-        sxx = p;
-        syy = p;
+        auto pi = Array(nx, ny).load(conf["initial_pressure"].as<std::string>());
+        sxxi = pi;
+        syyi = pi;
     }
 
     {
-        auto cpf_v = Array(nx, ny).load(conf["cp"].as<std::string>());
-        Var cpf(cpf_v);
-        cp = cpf;
+        auto cpf = Array(nx, ny).load(conf["cp"].as<std::string>());
+        cpi = cpf;
     }
 
     {
-        auto csf_v = Array(nx, ny).load(conf["cs"].as<std::string>());
-        Var csf(csf_v);
-        cs = csf;
+        auto csf = Array(nx, ny).load(conf["cs"].as<std::string>());
+        csi = csf;
     }
 
     {
-        auto rhof_v = Array(nx, ny).load(conf["rho"].as<std::string>());
-        Var rhof(rhof_v);
-        rho = rhof;
+        auto rhof = Array(nx, ny).load(conf["rho"].as<std::string>());
+        rhoi = rhof;
     }
 
     // extend material values on the boundaries
-    extend_ghost(Var(cp_v), gh, gnx, gny);
-    extend_ghost(Var(cs_v), gh, gnx, gny);
-    extend_ghost(Var(rho_v), gh, gnx, gny);
+    extend_ghost(cpa, gh, gnx, gny);
+    extend_ghost(csa, gh, gnx, gny);
+    extend_ghost(rhoa, gh, gnx, gny);
 
     {
-        auto cp = Var(cp_v);
-        auto cs = Var(cs_v);
-        auto rho = Var(rho_v);
-        auto la = Var(la_v);
-        auto mu = Var(mu_v);
-        auto lm = Var(lm_v);
+        mua = rhoa * csa * csa,
+        laa = rhoa * cpa * cpa - 2 * mua;
 
-        auto icp = Var(icp_v);
-        auto ics = Var(ics_v);
-        auto imu = Var(imu_v);
-        auto ilm = Var(ilm_v);
+        lma = laa + 2. * mua;
 
-        mu = rho * cs * cs,
-        la = rho * cp * cp - 2 * mu;
-
-        lm = la + 2. * mu;
-
-        icp = 1. / (2. * cp);
-        ics = 1. / (2. * cs);
-        imu = 1. / (2. * mu);
-        ilm = 1. / (2. * lm);
+        icpa = 1. / (2. * cpa);
+        icsa = 1. / (2. * csa);
+        imua = 1. / (2. * mua);
+        ilma = 1. / (2. * lma);
     }
-
-    Var w1nnx = w1.dx(+2);
-    Var w1nx = w1.dx(+1);
-    Var w1px = w1.dx(-1);
-    Var w1ppx = w1.dx(-2);
-
-    Var w1nny = w1.dy(+2);
-    Var w1ny = w1.dy(+1);
-    Var w1py = w1.dy(-1);
-    Var w1ppy = w1.dy(-2);
-
-    Var w2nnx = w2.dx(+2);
-    Var w2nx = w2.dx(+1);
-    Var w2px = w2.dx(-1);
-    Var w2ppx = w2.dx(-2);
-
-    Var w2nny = w2.dy(+2);
-    Var w2ny = w2.dy(+1);
-    Var w2py = w2.dy(-1);
-    Var w2ppy = w2.dy(-2);
-
-    Var w3nnx = w3.dx(+2);
-    Var w3nx = w3.dx(+1);
-    Var w3px = w3.dx(-1);
-    Var w3ppx = w3.dx(-2);
-
-    Var w3nny = w3.dy(+2);
-    Var w3ny = w3.dy(+1);
-    Var w3py = w3.dy(-1);
-    Var w3ppy = w3.dy(-2);
-
-    Var w4nnx = w4.dx(+2);
-    Var w4nx = w4.dx(+1);
-    Var w4px = w4.dx(-1);
-    Var w4ppx = w4.dx(-2);
-
-    Var w4nny = w4.dy(+2);
-    Var w4ny = w4.dy(+1);
-    Var w4py = w4.dy(-1);
-    Var w4ppy = w4.dy(-2);
 
     for (Int t = 0; t < time_steps; t++) {
         Temp c1, c2;
         Temp dw1, dw2, dw3, dw4;
 
         // to_omega_x
-        w1 = + vx * icp + sxx * ilm,
-        w2 = - vx * icp + sxx * ilm,
-        w3 = + vy * ics + sxy * imu,
-        w4 = - vy * ics + sxy * imu;
+        w1i = + vxi * icpi + sxxi * ilmi,
+        w2i = - vxi * icpi + sxxi * ilmi,
+        w3i = + vyi * icsi + sxyi * imui,
+        w4i = - vyi * icsi + sxyi * imui;
 
         // omega_x_solve
-        c1 = cp * dt / dx,
-        c2 = cs * dt / dx,
-        dw1 = advection(c1, w1nnx, w1nx, w1, w1px, w1ppx),
-        dw2 = advection(c1, w2ppx, w2px, w2, w2nx, w2nnx),
-        dw3 = advection(c2, w3nnx, w3nx, w3, w3px, w3ppx),
-        dw4 = advection(c2, w4ppx, w4px, w4, w4nx, w4nnx),
+        c1 = cpi * dt / dx,
+        c2 = csi * dt / dx,
+
+//        dw1 = advection(c1, w1i.dx(+2), w1i.dx(+1), w1i, w1i.dx(-1), w1i.dx(-2)),
+//        dw2 = advection(c1, w2i.dx(-2), w2i.dx(-1), w2i, w2i.dx(+1), w2i.dx(+2)),
+//        dw3 = advection(c2, w3i.dx(+2), w3i.dx(+1), w3i, w3i.dx(-1), w3i.dx(-2)),
+//        dw4 = advection(c2, w4i.dx(-2), w4i.dx(-1), w4i, w4i.dx(+1), w4i.dx(+2)),
+
+        dw1 = advection(c1, w1i.dx(-2), w1i.dx(-1), w1i, w1i.dx(+1), w1i.dx(+2)),
+        dw2 = advection(c1, w2i.dx(+2), w2i.dx(+1), w2i, w2i.dx(-1), w2i.dx(-2)),
+        dw3 = advection(c2, w3i.dx(-2), w3i.dx(-1), w3i, w3i.dx(+1), w3i.dx(+2)),
+        dw4 = advection(c2, w4i.dx(+2), w4i.dx(+1), w4i, w4i.dx(-1), w4i.dx(-2)),
 
         // from_omega_x
-        vx += cp * (dw1 - dw2),
-        vy += cs * (dw3 - dw4),
-        sxx += lm * (dw1 + dw2),
-        syy += la * (dw1 + dw2),
-        sxy += mu * (dw3 + dw4);
+        vxi += cpi * (dw1 - dw2),
+        vyi += csi * (dw3 - dw4),
+        sxxi += lmi * (dw1 + dw2),
+        syyi += lai * (dw1 + dw2),
+        sxyi += mui * (dw3 + dw4);
 
         // to_omega_y
-        w1 = + vy * icp + syy * ilm,
-        w2 = - vy * icp + syy * ilm,
-        w3 = + vx * ics + sxy * imu,
-        w4 = - vx * ics + sxy * imu;
+        w1i = + vyi * icpi + syyi * ilmi,
+        w2i = - vyi * icpi + syyi * ilmi,
+        w3i = + vxi * icsi + sxyi * imui,
+        w4i = - vxi * icsi + sxyi * imui;
 
         // omega_y_solve
-        c1 = cp * dt / dy,
-        c2 = cs * dt / dy,
-        dw1 = advection(c1, w1nny, w1ny, w1, w1py, w1ppy),
-        dw2 = advection(c1, w2ppy, w2py, w2, w2ny, w2nny),
-        dw3 = advection(c2, w3nny, w3ny, w3, w3py, w3ppy),
-        dw4 = advection(c2, w4ppy, w4py, w4, w4ny, w4nny),
+        c1 = cpi * dt / dy,
+        c2 = csi * dt / dy,
+
+        dw1 = advection(c1, w1i.dy(-2), w1i.dy(-1), w1i, w1i.dy(+1), w1i.dy(+2)),
+        dw2 = advection(c1, w2i.dy(+2), w2i.dy(+1), w2i, w2i.dy(-1), w2i.dy(-2)),
+        dw3 = advection(c2, w3i.dy(-2), w3i.dy(-1), w3i, w3i.dy(+1), w3i.dy(+2)),
+        dw4 = advection(c2, w4i.dy(+2), w4i.dy(+1), w4i, w4i.dy(-1), w4i.dy(-2)),
+
+//        dw1 = advection(c1, w1i.dy(+2), w1i.dy(+1), w1i, w1i.dy(-1), w1i.dy(-2)),
+//        dw2 = advection(c1, w2i.dy(-2), w2i.dy(-1), w2i, w2i.dy(+1), w2i.dy(+2)),
+//        dw3 = advection(c2, w3i.dy(+2), w3i.dy(+1), w3i, w3i.dy(-1), w3i.dy(-2)),
+//        dw4 = advection(c2, w4i.dy(-2), w4i.dy(-1), w4i, w4i.dy(+1), w4i.dy(+2)),
 
         // from_omega_y
-        vx += cs * (dw3 - dw4),
-        vy += cp * (dw1 - dw2),
-        sxx += la * (dw1 + dw2),
-        syy += lm * (dw1 + dw2),
-        sxy += mu * (dw3 + dw4);
+        vxi += csi * (dw3 - dw4),
+        vyi += cpi * (dw1 - dw2),
+        sxxi += lai * (dw1 + dw2),
+        syyi += lmi * (dw1 + dw2),
+        sxyi += mui * (dw3 + dw4);
 
         std::cout << "\rStep: " + std::to_string(t+1) << std::flush;
 
         if ((t + 1) % save_rate == 0) {
-            vx_v.save(save_path + "/vx_" + withLeadingZeros(t + 1, 6) + ".bin");
-            vy_v.save(save_path + "/vy_" + withLeadingZeros(t + 1, 6) + ".bin");
-            sxx_v.save(save_path + "/sxx_" + withLeadingZeros(t + 1, 6) + ".bin");
-            syy_v.save(save_path + "/syy_" + withLeadingZeros(t + 1, 6) + ".bin");
-            sxy_v.save(save_path + "/sxy_" + withLeadingZeros(t + 1, 6) + ".bin");
+            vxa.save(save_path + "/vx_" + withLeadingZeros(t + 1, 6) + ".bin");
+            vya.save(save_path + "/vy_" + withLeadingZeros(t + 1, 6) + ".bin");
+            sxxa.save(save_path + "/sxx_" + withLeadingZeros(t + 1, 6) + ".bin");
+            syya.save(save_path + "/syy_" + withLeadingZeros(t + 1, 6) + ".bin");
+            sxya.save(save_path + "/sxy_" + withLeadingZeros(t + 1, 6) + ".bin");
         }
     }
 

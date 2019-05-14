@@ -17,6 +17,19 @@ static cl::opt<std::string> MyToolOutput("o", cl::desc("Output file"), cl::cat(M
 const char loops[] = "for (Int _j = 0; _j < _size.y; _j++) {\n"
                      "for (Int _i = 0; _i < _size.x; _i++) {\n";
 
+std::string escapedName(std::string name) {
+    for (char& c : name) {
+        if (!std::isalnum(c)) {
+            switch (c) {
+            case '-': c = 'm'; break;
+            case '+': c = 'p'; break;
+            default: c = '_';
+            }
+        }
+    }
+    return '_' + name;
+}
+
 class SequenceVisitor : public RecursiveASTVisitor<SequenceVisitor> {
 public:
     SequenceVisitor(Rewriter& rewriter)
@@ -27,16 +40,31 @@ public:
 
     bool TraverseStmt(Stmt* e) {
         if (e && isa<Expr>(e) &&
-                cast<Expr>(e)->getType().getAsString() == "struct Var")
+                (cast<Expr>(e)->getType().getAsString() == "struct Var" ||
+                 cast<Expr>(e)->getType().getAsString() == "struct Array"))
         {
+
+            std::string s = Lexer::getSourceText(
+                        CharSourceRange::getTokenRange(e->getSourceRange()),
+                        mRewriter.getSourceMgr(),
+                        LangOptions());
+            std::string es = escapedName(s);
+
+            mRewriter.ReplaceText(e->getSourceRange(), es);
+
             mRewriter.InsertTextAfterToken(e->getEndLoc(), ".val(_i, _j)");
 
-            {
-                StringRef s = Lexer::getSourceText(
-                            CharSourceRange::getTokenRange(e->getSourceRange()),
-                            mRewriter.getSourceMgr(),
-                            LangOptions());
-                vars.push_back(s);
+            // highly inefficient =)
+            bool doNotAdd = false;
+            for (auto& e : vars) {
+                if (e.first == s || e.second == es) {
+                    assert(e.first == s && e.second == es);
+                    doNotAdd = true;
+                }
+            }
+
+            if (!doNotAdd) {
+                vars.push_back(std::make_pair(s, es));
             }
 
             return true;
@@ -53,7 +81,7 @@ public:
         return true;
     }
 
-    std::vector<std::string> vars;
+    std::vector<std::pair<std::string, std::string>> vars;
 
 private:
     Rewriter& mRewriter;
@@ -101,21 +129,30 @@ public:
             SourceLocation begin = expr->getBeginLoc();
             SourceLocation end = expr->getEndLoc();
 
-            // add assertions
             SequenceVisitor sv(mRewriter);
             sv.TraverseStmt(expr);
 
             if (sv.vars.empty()) {
+                // sometimes it can be empty (in headers)
+                // but if it is empty in our code we should stop on error
                 mRewriter.InsertText(begin, "!!! ``` !!!", true, true);
                 return true;
             }
 
             mRewriter.InsertText(begin, "{\n", true, true);
-            auto sizeStr = (Twine("Size _size = ") + sv.vars[0] + ".range.size();\n").str();
+
+            // put all Vars into temporaries
+            for (auto& e : sv.vars) {
+                std::string ss = (Twine("Var ") + (e.second) + " = " + e.first + ";\n").str();
+                mRewriter.InsertText(begin, ss, true, true);
+            }
+
+            auto sizeStr = (Twine("Size _size = ") + sv.vars[0].second + ".range().size();\n").str();
             mRewriter.InsertText(begin, sizeStr, true, true);
 
-            for (const std::string& s : sv.vars) {
-                std::string ss = (Twine("assert(") + s + ".range.size() == _size);\n").str();
+            // add assertions
+            for (auto& e : sv.vars) {
+                std::string ss = (Twine("assert(") + e.second + ".range().size() == _size);\n").str();
                 mRewriter.InsertText(begin, ss, true, true);
             }
 
