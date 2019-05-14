@@ -16,13 +16,19 @@ static cl::opt<std::string> MyToolOutput("o", cl::desc("Output file"), cl::cat(M
 static cl::opt<bool> LoopsVectorization("lv", cl::desc("Loops vectorization"), cl::cat(MyToolCategory));
 
 
-const char loops[] = "for (Int _j = 0; _j < _size.y; _j++)\n"
-                     "for (Int _i = 0; _i < _size.x; _i++)\n"
-                     "_evaluate(_i, _j);\n";
+const char loops[] = "for (Int _j = 0; _j < _size.y; _j++) {\n"
+                     "for (Int _i = 0; _i < _size.x; _i++) {\n"
+                     "_evaluate(_i, _j, Real());\n"
+                     "}\n"
+                     "}\n";
+
 
 //const char vecLoops[] =
 //        "for (Int _j = 0; _j < _size.y; _j++) {\n"
-//        "for (Int _i = 0; _i < _size.x / 4 * 4; _i+=4) {\n";
+//        "for (Int _i = 0; _i < _size.x / 4 * 4; _i+=4) {\n"
+//        ""
+//        "}\n"
+//        "}\n";
 
 std::string escapedName(std::string name) {
     for (char& c : name) {
@@ -57,9 +63,8 @@ public:
                         LangOptions());
             std::string es = escapedName(s);
 
-            mRewriter.ReplaceText(e->getSourceRange(), es);
+            mRewriter.ReplaceText(e->getSourceRange(), "(*" + es + ")");
 
-            mRewriter.InsertTextAfterToken(e->getEndLoc(), ".val(_i, _j)");
 
             // highly inefficient =)
             bool doNotAdd = false;
@@ -159,22 +164,31 @@ public:
 
             // put all Vars into temporaries
             for (auto& e : sv.vars) {
-                std::string ss = (Twine("Var ") + (e.second) + " = " + e.first + ";\n").str();
+                std::string ss = (Twine("Var ") + "t" + e.second + " = " + e.first + ";\n").str();
                 mRewriter.InsertText(begin, ss, true, true);
             }
 
-            auto sizeStr = (Twine("Size _size = ") + sv.vars[0].second + ".range().size();\n").str();
+            auto sizeStr = (Twine("Size _size = ") + "t" + sv.vars[0].second + ".range().size();\n").str();
             mRewriter.InsertText(begin, sizeStr, true, true);
 
             // add assertions
             for (auto& e : sv.vars) {
-                std::string ss = (Twine("assert(") + e.second + ".range().size() == _size);\n").str();
+                std::string ss = (Twine("assert(") + "t" + e.second + ".range().size() == _size);\n").str();
                 mRewriter.InsertText(begin, ss, true, true);
             }
 
             // add expression lambda
 
-            mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j) [[gnu::always_inline]] {\n", true, true);
+            mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) [[gnu::always_inline]] {\n", true, true);
+            mRewriter.InsertText(begin, "using T = decltype(type);\n", true, true);
+
+            // extract values
+            for (auto& e : sv.vars) {
+                std::string ss = (Twine("T* ") + e.second + " = (T*)&t" + e.second + ".val(_i, _j);\n").str();
+                mRewriter.InsertText(begin, ss, true, true);
+            }
+
+
             mRewriter.InsertText(end, "\n};\n", true, true);
 
             // insert loops
