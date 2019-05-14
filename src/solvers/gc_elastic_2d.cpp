@@ -84,8 +84,8 @@ int main(int argc, char** argv) {
     Array vx_v(size), vy_v(size), sxx_v(size), syy_v(size), sxy_v(size);
 
 
-    Array cp_v(size), cs_v(size), rho_v(size), la_v(size), mu_v(size), lm_v(size);
-    Array icp_v(size), ics_v(size), ila_v(size), imu_v(size), ilm_v(size);
+    //Array cp_v(size), cs_v(size), rho_v(size), la_v(size), mu_v(size), lm_v(size);
+    //Array icp_v(size), ics_v(size), ila_v(size), imu_v(size), ilm_v(size);
 
     Array w1_v(size), w2_v(size), w3_v(size), w4_v(size);
 
@@ -100,17 +100,27 @@ int main(int argc, char** argv) {
     auto syy = Var(syy_v, inside);
     auto sxy = Var(sxy_v, inside);
 
-    auto cp = Var(cp_v, inside);
-    auto cs = Var(cs_v, inside);
-    auto rho = Var(rho_v, inside);
-    auto la = Var(la_v, inside);
-    auto mu = Var(mu_v, inside);
-    auto lm = Var(lm_v, inside);
+    Real cp = 2;
+    //auto cp = Var(cp_v, inside);
+    Real cs = 1;
+    //auto cs = Var(cs_v, inside);
+    Real rho = 1.5;
+    //auto rho = Var(rho_v, inside);
+    Real la;
+    //auto la = Var(la_v, inside);
+    Real mu;
+    //auto mu = Var(mu_v, inside);
+    Real lm;
+    //auto lm = Var(lm_v, inside);
 
-    auto icp = Var(icp_v, inside);
-    auto ics = Var(ics_v, inside);
-    auto imu = Var(imu_v, inside);
-    auto ilm = Var(ilm_v, inside);
+    Real icp;
+    //auto icp = Var(icp_v, inside);
+    Real ics;
+    //auto ics = Var(ics_v, inside);
+    Real imu;
+    //auto imu = Var(imu_v, inside);
+    Real ilm;
+    //auto ilm = Var(ilm_v, inside);
 
     {
         auto p_v = Array(nx, ny).load(conf["initial_pressure"].as<std::string>());
@@ -119,41 +129,41 @@ int main(int argc, char** argv) {
         syy = p;
     }
 
-    {
-        auto cpf_v = Array(nx, ny).load(conf["cp"].as<std::string>());
-        Var cpf(cpf_v);
-        cp = cpf;
-    }
+//    {
+//        auto cpf_v = Array(nx, ny).load(conf["cp"].as<std::string>());
+//        Var cpf(cpf_v);
+//        cp = cpf;
+//    }
 
-    {
-        auto csf_v = Array(nx, ny).load(conf["cs"].as<std::string>());
-        Var csf(csf_v);
-        cs = csf;
-    }
+//    {
+//        auto csf_v = Array(nx, ny).load(conf["cs"].as<std::string>());
+//        Var csf(csf_v);
+//        cs = csf;
+//    }
 
-    {
-        auto rhof_v = Array(nx, ny).load(conf["rho"].as<std::string>());
-        Var rhof(rhof_v);
-        rho = rhof;
-    }
+//    {
+//        auto rhof_v = Array(nx, ny).load(conf["rho"].as<std::string>());
+//        Var rhof(rhof_v);
+//        rho = rhof;
+//    }
 
     // extend material values on the boundaries
-    extend_ghost(Var(cp_v), gh, gnx, gny);
-    extend_ghost(Var(cs_v), gh, gnx, gny);
-    extend_ghost(Var(rho_v), gh, gnx, gny);
+//    extend_ghost(Var(cp_v), gh, gnx, gny);
+//    extend_ghost(Var(cs_v), gh, gnx, gny);
+//    extend_ghost(Var(rho_v), gh, gnx, gny);
 
     {
-        auto cp = Var(cp_v);
-        auto cs = Var(cs_v);
-        auto rho = Var(rho_v);
-        auto la = Var(la_v);
-        auto mu = Var(mu_v);
-        auto lm = Var(lm_v);
+//        auto cp = Var(cp_v);
+//        auto cs = Var(cs_v);
+//        auto rho = Var(rho_v);
+//        auto la = Var(la_v);
+//        auto mu = Var(mu_v);
+//        auto lm = Var(lm_v);
 
-        auto icp = Var(icp_v);
-        auto ics = Var(ics_v);
-        auto imu = Var(imu_v);
-        auto ilm = Var(ilm_v);
+//        auto icp = Var(icp_v);
+//        auto ics = Var(ics_v);
+//        auto imu = Var(imu_v);
+//        auto ilm = Var(ilm_v);
 
         mu = rho * cs * cs,
         la = rho * cp * cp - 2 * mu;
