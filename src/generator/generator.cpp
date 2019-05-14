@@ -13,9 +13,16 @@ using namespace llvm;
 
 static cl::OptionCategory MyToolCategory("My tool options");
 static cl::opt<std::string> MyToolOutput("o", cl::desc("Output file"), cl::cat(MyToolCategory));
+static cl::opt<bool> LoopsVectorization("lv", cl::desc("Loops vectorization"), cl::cat(MyToolCategory));
 
-const char loops[] = "for (Int _j = 0; _j < _size.y; _j++) {\n"
-                     "for (Int _i = 0; _i < _size.x; _i++) {\n";
+
+const char loops[] = "for (Int _j = 0; _j < _size.y; _j++)\n"
+                     "for (Int _i = 0; _i < _size.x; _i++)\n"
+                     "_evaluate(_i, _j);\n";
+
+//const char vecLoops[] =
+//        "for (Int _j = 0; _j < _size.y; _j++) {\n"
+//        "for (Int _i = 0; _i < _size.x / 4 * 4; _i+=4) {\n";
 
 std::string escapedName(std::string name) {
     for (char& c : name) {
@@ -126,8 +133,17 @@ public:
             Expr* expr = cast<Expr>(e);
             assert(expr);
 
+            // find begin and end
             SourceLocation begin = expr->getBeginLoc();
             SourceLocation end = expr->getEndLoc();
+
+            // find length of last token
+            unsigned endOffset = Lexer::MeasureTokenLength(
+                        end, mRewriter.getSourceMgr(), mRewriter.getLangOpts());
+            endOffset++; // skip ';' after last token
+            end = end.getLocWithOffset(endOffset);
+
+            // process expression
 
             SequenceVisitor sv(mRewriter);
             sv.TraverseStmt(expr);
@@ -156,18 +172,15 @@ public:
                 mRewriter.InsertText(begin, ss, true, true);
             }
 
-            // add loops
+            // add expression lambda
 
-            mRewriter.InsertText(begin, loops, true, true);
+            mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j) [[gnu::always_inline]] {\n", true, true);
+            mRewriter.InsertText(end, "\n};\n", true, true);
 
+            // insert loops
+            mRewriter.InsertText(end, loops, true, true);
 
-            // find length of last token
-            unsigned endOffset = Lexer::MeasureTokenLength(
-                        end, mRewriter.getSourceMgr(), mRewriter.getLangOpts());
-            endOffset++; // skip ';' after last token
-            end = end.getLocWithOffset(endOffset);
-
-            mRewriter.InsertText(end, "\n}\n}\n}", true, true);
+            mRewriter.InsertText(end, "}\n", true, true);
 
             return true;
         } else {
