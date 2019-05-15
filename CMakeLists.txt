@@ -102,6 +102,7 @@ function(add_solver solver)
             ${CMAKE_CURRENT_SOURCE_DIR}/src/solvers/${solver}.cpp
             -o ${solver}.gen.cpp
             -p ${CMAKE_CURRENT_BINARY_DIR}
+            -lv
 
         # next line forces regeneration if generator or source are changed
         DEPENDS solver_generator ${solver}-dummy
@@ -111,9 +112,7 @@ function(add_solver solver)
 
     add_executable(${solver} ${solver}.gen.cpp)
     target_link_libraries(${solver} hrdata solver_lib)
-    if (${CMAKE_BUILD_TYPE} EQUAL "Debug")
-        target_compile_definitions(${solver} PRIVATE _GLIBCXX_DEBUG)
-    endif()
+    target_compile_options(${solver} PRIVATE -march=native) # enables vector instructions
 endfunction()
 
 

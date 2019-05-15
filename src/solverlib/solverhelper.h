@@ -8,10 +8,14 @@
 #include <fstream>
 #include <iomanip>
 #include <cassert>
+#include <cmath>
+#include <algorithm>
 
 #ifndef NDEBUG
 #include <fenv.h>
 #endif
+
+#include "vectorclass.h"
 
 using Int = int64_t;
 using Real = double;
@@ -84,7 +88,18 @@ template <typename T> struct isExprNode {
     static const bool value = std::is_arithmetic<T>::value;
 };
 
+template <typename T> struct isStrictExprNode {
+    static const bool value = isExprNode<T>::value && !std::is_arithmetic<T>::value;
+};
+
 template <typename T> struct isSequence { static const bool value = false; };
+
+template <typename T1, typename T2>
+struct hasStrictExprNode {
+    static const bool value = isExprNode<T1>::value && isExprNode<T1>::value &&
+        (isStrictExprNode<T1>::value || isStrictExprNode<T2>::value);
+};
+
 
 struct Expr;
 struct Var;
@@ -120,6 +135,8 @@ struct Array {
     }
 
     Real& val(Int x, Int y) {
+        assert(0 <= x && x < mSize.x);
+        assert(0 <= y && y < mSize.y);
         return mData[size_t(x + mSize.x * y)];
     }
 
@@ -169,6 +186,8 @@ struct Var {
     Assign operator/=(const Expr&) { return Assign(); }
 
     Real& val(Int x, Int y) {
+        assert(0 <= x && x < mRange.size().x);
+        assert(0 <= y && y < mRange.size().y);
         return mArray.val(mRange.xs + x, mRange.ys + y);
     }
 
@@ -212,6 +231,7 @@ template <Int Dim> struct isExprNode<Nodes<Dim>> { static const bool value = tru
 template <> struct isSequence<Assign> { static const bool value = true; };
 template <> struct isSequence<Sequence> { static const bool value = true; };
 
+
 struct Expr {
     Expr() {}
     template <typename T, std::enable_if_t<isExprNode<Expr>::value, int> = 0>
@@ -219,47 +239,47 @@ struct Expr {
 };
 
 template <typename Expr1, typename Expr2,
-          std::enable_if_t<isExprNode<Expr1>::value, int> = 0,
-          std::enable_if_t<isExprNode<Expr2>::value, int> = 0>
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
+Expr max(Expr1, Expr2) { return Expr(); }
+
+
+template <typename Expr1, typename Expr2,
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
+Expr min(Expr1, Expr2) { return Expr(); }
+
+template <typename Expr1, typename Expr2,
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
 Expr operator+(Expr1, Expr2) { return Expr(); }
 
 template <typename Expr1, typename Expr2,
-          std::enable_if_t<isExprNode<Expr1>::value, int> = 0,
-          std::enable_if_t<isExprNode<Expr2>::value, int> = 0>
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
 Expr operator-(Expr1, Expr2) { return Expr(); }
 
 template <typename Expr1, typename Expr2,
-          std::enable_if_t<isExprNode<Expr1>::value, int> = 0,
-          std::enable_if_t<isExprNode<Expr2>::value, int> = 0>
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
 Expr operator*(Expr1, Expr2) { return Expr(); }
 
 template <typename Expr1, typename Expr2,
-          std::enable_if_t<isExprNode<Expr1>::value, int> = 0,
-          std::enable_if_t<isExprNode<Expr2>::value, int> = 0>
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
 Expr operator/(Expr1, Expr2) { return Expr(); }
 
-template <typename E,
-          std::enable_if_t<isExprNode<E>::value, int> = 0>
+template <typename E, std::enable_if_t<isStrictExprNode<E>::value, int> = 0>
 Expr operator+(E) { return Expr(); }
 
-template <typename E,
-          std::enable_if_t<isExprNode<E>::value, int> = 0>
+template <typename E, std::enable_if_t<isStrictExprNode<E>::value, int> = 0>
 Expr operator-(E) { return Expr(); }
 
-template <typename E, typename X,
-          std::enable_if_t<isExprNode<E>::value, int> = 0,
-          std::enable_if_t<isExprNode<X>::value, int> = 0>
-Expr operator+=(E, X) { return Expr(); }
+template <typename Expr1, typename Expr2,
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
+Expr operator+=(Expr1, Expr2) { return Expr(); }
 
 
 template <typename Expr1, typename Expr2,
-          std::enable_if_t<isExprNode<Expr1>::value, int> = 0,
-          std::enable_if_t<isExprNode<Expr2>::value, int> = 0>
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
 bool operator>(Expr1, Expr2) { return true; }
 
 template <typename Expr1, typename Expr2,
-          std::enable_if_t<isExprNode<Expr1>::value, int> = 0,
-          std::enable_if_t<isExprNode<Expr2>::value, int> = 0>
+          std::enable_if_t<hasStrictExprNode<Expr1, Expr2>::value, int> = 0>
 bool operator<(Expr1, Expr2) { return true; }
 
 template <typename S1, typename S2,
@@ -279,5 +299,165 @@ inline std::string withLeadingZeros(Int value, Int leadingZeros)
      return oss.str();
 }
 
+// opearators disambiguation
+
+Real min(Real lhs, Real rhs) {
+    return std::min(lhs, rhs);
+}
+
+Real max(Real lhs, Real rhs) {
+    return std::max(lhs, rhs);
+}
+
+// vectorization
+
+struct Real4 {
+    Real4() {}
+    Real4(Vec4d val) : val(val) {}
+
+    Real4& operator+() {
+        return *this;
+    }
+    const Real4& operator-() {
+        val = -val;
+        return *this;
+    }
+
+    const Real4& operator=(Real rhs) {
+        val = rhs;
+        return *this;
+    }
+
+    const Real4& operator+=(const Real4& rhs) {
+        val += rhs.val;
+        return *this;
+    }
+    const Real4& operator-=(const Real4& rhs) {
+        val -= rhs.val;
+        return *this;
+    }
+    const Real4& operator*=(const Real4& rhs) {
+        val *= rhs.val;
+        return *this;
+    }
+    const Real4& operator/=(const Real4& rhs) {
+        val /= rhs.val;
+        return *this;
+    }
+
+    const Real4& operator+=(Real rhs) {
+        val += rhs;
+        return *this;
+    }
+    const Real4& operator-=(Real rhs) {
+        val -= rhs;
+        return *this;
+    }
+    const Real4& operator*=(Real rhs) {
+        val *= rhs;
+        return *this;
+    }
+    const Real4& operator/=(Real rhs) {
+        val /= rhs;
+        return *this;
+    }
+
+    Vec4d val;
+};
+
+
+Real4 operator+(const Real4& lhs, const Real4& rhs) {
+    return Real4(lhs.val + rhs.val);
+}
+
+Real4 operator-(const Real4& lhs, const Real4& rhs) {
+    return Real4(lhs.val - rhs.val);
+}
+
+Real4 operator*(const Real4& lhs, const Real4& rhs) {
+    return Real4(lhs.val * rhs.val);
+}
+
+Real4 operator/(const Real4& lhs, const Real4& rhs) {
+    return Real4(lhs.val / rhs.val);
+}
+
+Real4 operator+(const Real& lhs, const Real4& rhs) {
+    return Real4(lhs + rhs.val);
+}
+
+Real4 operator+(const Real4& lhs, const Real& rhs) {
+    return Real4(lhs.val + rhs);
+}
+
+Real4 operator-(const Real& lhs, const Real4& rhs) {
+    return Real4(lhs - rhs.val);
+}
+
+Real4 operator-(const Real4& lhs, const Real& rhs) {
+    return Real4(lhs.val - rhs);
+}
+
+Real4 operator*(const Real& lhs, const Real4& rhs) {
+    return Real4(lhs * rhs.val);
+}
+
+Real4 operator*(const Real4& lhs, const Real& rhs) {
+    return Real4(lhs.val * rhs);
+}
+
+Real4 operator/(const Real& lhs, const Real4& rhs) {
+    return Real4(lhs / rhs.val);
+}
+
+Real4 operator/(const Real4& lhs, const Real& rhs) {
+    return Real4(lhs.val / rhs);
+}
+
+Real4 min(const Real& lhs, const Real4& rhs) {
+    Vec4d l(lhs);
+    return Real4(min(l, rhs.val));
+}
+
+Real4 min(const Real4& lhs, const Real& rhs) {
+    Vec4d r(rhs);
+    return Real4(min(lhs.val, r));
+}
+
+Real4 min(const Real4& lhs, const Real4& rhs) {
+    return Real4(min(lhs.val, rhs.val));
+}
+
+Real4 max(const Real& lhs, const Real4& rhs) {
+    Vec4d l(lhs);
+    return Real4(max(l, rhs.val));
+}
+
+Real4 max(const Real4& lhs, const Real& rhs) {
+    Vec4d r(rhs);
+    return Real4(max(lhs.val, r));
+}
+
+Real4 max(const Real4& lhs, const Real4& rhs) {
+    return Real4(max(lhs.val, rhs.val));
+}
+
+
+
+inline void loadFromPtr(Real& l, Real* r) {
+    l = *r;
+}
+
+inline void loadFromPtr(Real4& l, Real* r) {
+    l.val.load(r);
+}
+
+inline void storeToPtr(Real* l, Real r) {
+    *l = r;
+}
+
+inline void storeToPtr(Real* l, Real4 r) {
+    r.val.store(l);
+}
 
 #endif // SOLVERHELPER_H

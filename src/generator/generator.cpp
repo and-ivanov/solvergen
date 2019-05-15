@@ -23,12 +23,16 @@ const char loops[] = "for (Int _j = 0; _j < _size.y; _j++) {\n"
                      "}\n";
 
 
-//const char vecLoops[] =
-//        "for (Int _j = 0; _j < _size.y; _j++) {\n"
-//        "for (Int _i = 0; _i < _size.x / 4 * 4; _i+=4) {\n"
-//        ""
-//        "}\n"
-//        "}\n";
+const char vecLoops[] =
+        "for (Int _j = 0; _j < _size.y; _j++) {\n"
+        "Int _i = 0;\n"
+        "for (; _i < _size.x / 4 * 4; _i+=4) {\n"
+        "_evaluate(_i, _j, Real4());\n"
+        "}\n"
+        "for (; _i < _size.x; _i++) {\n"
+        "_evaluate(_i, _j, Real());\n"
+        "}\n"
+        "}\n";
 
 std::string escapedName(std::string name) {
     for (char& c : name) {
@@ -41,6 +45,18 @@ std::string escapedName(std::string name) {
         }
     }
     return '_' + name;
+}
+
+std::string temporaryName(const std::string& name) {
+    return 't' + escapedName(name);
+}
+
+std::string getText(Stmt* stmt, Rewriter& rewriter) {
+    assert(stmt);
+    return Lexer::getSourceText(
+            CharSourceRange::getTokenRange(stmt->getSourceRange()),
+            rewriter.getSourceMgr(),
+            LangOptions());
 }
 
 class SequenceVisitor : public RecursiveASTVisitor<SequenceVisitor> {
@@ -56,33 +72,46 @@ public:
                 (cast<Expr>(e)->getType().getAsString() == "struct Var" ||
                  cast<Expr>(e)->getType().getAsString() == "struct Array"))
         {
+            std::string text = getText(e, mRewriter);
+            
+            mRewriter.ReplaceText(e->getSourceRange(), escapedName(text));
 
-            std::string s = Lexer::getSourceText(
-                        CharSourceRange::getTokenRange(e->getSourceRange()),
-                        mRewriter.getSourceMgr(),
-                        LangOptions());
-            std::string es = escapedName(s);
-
-            mRewriter.ReplaceText(e->getSourceRange(), "(*" + es + ")");
-
-
-            // highly inefficient =)
-            bool doNotAdd = false;
-            for (auto& e : vars) {
-                if (e.first == s || e.second == es) {
-                    assert(e.first == s && e.second == es);
-                    doNotAdd = true;
-                }
-            }
-
-            if (!doNotAdd) {
-                vars.push_back(std::make_pair(s, es));
-            }
+            rhsVars.insert(text);
+            
+            return true;
+        } else if (e && isa<Expr>(e) && cast<Expr>(e)->getType().getAsString() == "struct Temp") {
+            std::string tempName = getText(e, mRewriter);
+            temps.insert(tempName);
+            
+            mRewriter.ReplaceText(e->getSourceRange(), escapedName(tempName));
 
             return true;
+        } else if (e && isa<CXXOperatorCallExpr>(e) &&
+                   cast<CXXOperatorCallExpr>(e)->getType().getAsString() == "struct Assign") {
+            auto ee = cast<CXXOperatorCallExpr>(e);
+            assert(ee->getNumArgs() == 2);
+
+            Expr* lhs = ee->getArg(0);
+        
+            assert(lhs->getType().getAsString() == "struct Array" ||
+                lhs->getType().getAsString() == "struct Var" ||
+                lhs->getType().getAsString() == "struct Temp");
+
+            std::string lhsText = getText(lhs, mRewriter);
+        
+            mRewriter.ReplaceText(lhs->getSourceRange(), escapedName(lhsText));
+
+            if (lhs->getType().getAsString() == "struct Array" || 
+                lhs->getType().getAsString() == "struct Var") 
+            {
+                lhsVars.insert(lhsText);
+            }
+            
+            return RecursiveASTVisitor<SequenceVisitor>::TraverseStmt(ee->getArg(1));
         } else {
             return RecursiveASTVisitor<SequenceVisitor>::TraverseStmt(e);
         }
+
     }
 
     bool VisitDeclRefExpr(DeclRefExpr* e) {
@@ -92,8 +121,17 @@ public:
 
         return true;
     }
+    
+    std::set<std::string> allVars() {
+        std::set<std::string> res;
+        res.insert(lhsVars.begin(), lhsVars.end());
+        res.insert(rhsVars.begin(), rhsVars.end());
+        return res;
+    }
 
-    std::vector<std::pair<std::string, std::string>> vars;
+    std::set<std::string> rhsVars; // each use of Var
+    std::set<std::string> lhsVars; // each use of Var
+    std::set<std::string> temps; // each use of Temp
 
 private:
     Rewriter& mRewriter;
@@ -110,21 +148,38 @@ public:
 
     bool VisitVarDecl(VarDecl *v) {
         if (v->getType().getAsString() == "struct Temp") {
-            auto r = v->getTypeSourceInfo()->getTypeLoc().getSourceRange();
-            mRewriter.ReplaceText(r, "Real");
+//            auto r = v->getTypeSourceInfo()->getTypeLoc().getSourceRange();
+//            mRewriter.ReplaceText(r, "Real");
+            mRewriter.RemoveText(v->getSourceRange());
         }
         return true;
     }
 
     bool VisitFunctionDecl(FunctionDecl *f) {
+        bool exprDetected = false;
         if (f->getReturnType().getAsString() == "struct Expr") {
-            mRewriter.ReplaceText(f->getReturnTypeSourceRange(), "Real");
+            mRewriter.ReplaceText(f->getReturnTypeSourceRange(), "auto");
         }
+
+        int templatesNum = 0;
+
         for (unsigned i = 0; i < f->getNumParams(); i++) {
             ParmVarDecl* p = f->getParamDecl(i);
             if (p->getType().getAsString() == "struct Expr") {
-                mRewriter.ReplaceText(p->getTypeSourceInfo()->getTypeLoc().getSourceRange(), "Real");
+                mRewriter.ReplaceText(p->getTypeSourceInfo()->getTypeLoc().getSourceRange(),
+                                      "E" + std::to_string(templatesNum));
+                templatesNum += 1;
             }
+        }
+        if (templatesNum > 0) {
+            mRewriter.InsertText(f->getBeginLoc(), "template <", true, true);
+            for (int i = 0; i < templatesNum; i++) {
+                mRewriter.InsertText(f->getBeginLoc(), "typename E" + std::to_string(i), true, true);
+                if (i != templatesNum - 1) {
+                    mRewriter.InsertText(f->getBeginLoc(), ", ", true, true);
+                }
+            }
+            mRewriter.InsertText(f->getBeginLoc(), ">\n", true, true);
         }
 
         return true;
@@ -153,7 +208,7 @@ public:
             SequenceVisitor sv(mRewriter);
             sv.TraverseStmt(expr);
 
-            if (sv.vars.empty()) {
+            if (sv.allVars().empty()) {
                 // sometimes it can be empty (in headers)
                 // but if it is empty in our code we should stop on error
                 mRewriter.InsertText(begin, "!!! ``` !!!", true, true);
@@ -162,37 +217,70 @@ public:
 
             mRewriter.InsertText(begin, "{\n", true, true);
 
-            // put all Vars into temporaries
-            for (auto& e : sv.vars) {
-                std::string ss = (Twine("Var ") + "t" + e.second + " = " + e.first + ";\n").str();
+            // put all rhs Vars into temporaries
+            for (auto& e : sv.allVars()) {
+                std::string ss = (Twine("Var ") + temporaryName(e) + " = " + e + ";\n").str();
                 mRewriter.InsertText(begin, ss, true, true);
             }
 
-            auto sizeStr = (Twine("Size _size = ") + "t" + sv.vars[0].second + ".range().size();\n").str();
+            // find iteration space size
+            auto sizeStr = (Twine("Size _size = ") + temporaryName(*sv.allVars().begin()) + ".range().size();\n").str();
             mRewriter.InsertText(begin, sizeStr, true, true);
 
             // add assertions
-            for (auto& e : sv.vars) {
-                std::string ss = (Twine("assert(") + "t" + e.second + ".range().size() == _size);\n").str();
+            for (auto& e : sv.allVars()) {
+                std::string ss = (Twine("assert(") + temporaryName(e) + ".range().size() == _size);\n").str();
                 mRewriter.InsertText(begin, ss, true, true);
             }
 
             // add expression lambda
 
-            mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) [[gnu::always_inline]] {\n", true, true);
+            mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {\n", true, true);
             mRewriter.InsertText(begin, "using T = decltype(type);\n", true, true);
 
-            // extract values
-            for (auto& e : sv.vars) {
-                std::string ss = (Twine("T* ") + e.second + " = (T*)&t" + e.second + ".val(_i, _j);\n").str();
+            // create temporaries for each loop iteration
+            mRewriter.InsertText(begin, "// temporaries\n", true, true);
+            for (auto& e : sv.temps) {
+                std::string ss = (Twine("T ") + escapedName(e) + ";\n").str();
+                mRewriter.InsertText(begin, ss, true, true);
+            }
+            
+            mRewriter.InsertText(begin, "// variables\n", true, true);
+            for (auto& e : sv.allVars()) {
+                std::string ss = (Twine("T ") + escapedName(e) + ";\n").str();
                 mRewriter.InsertText(begin, ss, true, true);
             }
 
+            // load values from both lhs and rhs
+            // we load lhs, because it is difficult to detect is it read only or read write
+            mRewriter.InsertText(begin, "// loads\n", true, true);
+            for (auto& e : sv.allVars()) {
+                std::string ss = (Twine("loadFromPtr(") + escapedName(e) + ", " +
+                                  "&" + temporaryName(e) + ".val(_i, _j));\n").str();
+                mRewriter.InsertText(begin, ss, true, true);
+            }
 
-            mRewriter.InsertText(end, "\n};\n", true, true);
+            // here the main expressions will be inserted
+            // add end of line after it
+            mRewriter.InsertText(end, "\n", true, true);
+            
+            // store values to lhs
+            for (auto& e : sv.lhsVars) {
+                std::string ss = (Twine("storeToPtr(") + 
+                    "&" + temporaryName(e) + ".val(_i, _j)," +
+                    escapedName(e) + ");\n").str();
+                mRewriter.InsertText(end, ss, true, true);
+            }
+            
+            // add closing brace of lambda
+            mRewriter.InsertText(end, "};\n", true, true);
 
-            // insert loops
-            mRewriter.InsertText(end, loops, true, true);
+            // insert loops with call to lambda
+            if (LoopsVectorization.getValue()) {
+                mRewriter.InsertText(end, vecLoops, true, true);
+            } else {
+                mRewriter.InsertText(end, loops, true, true);
+            }
 
             mRewriter.InsertText(end, "}\n", true, true);
 

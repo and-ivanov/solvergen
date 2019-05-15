@@ -12,13 +12,10 @@ void extend_ghost(Var a, Int gh, Int gnx, Int gny) {
     }
 }
 
-inline Expr le_min(Expr a, Expr b) { return a > b ? b : a; }
-inline Expr le_max(Expr a, Expr b) { return a > b ? a : b;  }
-inline Expr le_max(Expr a, Expr b, Expr c) { return le_max(a, le_max(b, c)); }
 inline bool isNull(Expr a) { return -RealEps < a && a < RealEps; }
 
 inline Expr limiter(Expr r) {
-    return le_max(0.0, le_min(1.0, 2.0 * r), le_min(2.0, r));
+    return max(0.0, max(min(1.0, 2.0 * r), min(2.0, r)));
 }
 
 inline Expr advection(Expr c, Expr ppu, Expr pu, Expr u, Expr nu, Expr nnu) {
