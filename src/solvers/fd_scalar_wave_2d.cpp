@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
         auto np = Var(t % 2 == 0 ? np_v : p_v, inside);
 
         np = 2 * p - np + c * c * dt * dt * ((p.dx(-1) - 2 * p + p.dx(+1)) / (dx * dx) +
-                                             (p.dy(-1) - 2 * p + p.dy(+1)) / (dy * dx));
+                                             (p.dy(-1) - 2 * p + p.dy(+1)) / (dy * dy));
 
         std::cout << "\rStep: " + std::to_string(t+1) << std::flush;
 

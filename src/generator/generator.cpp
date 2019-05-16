@@ -7,6 +7,8 @@
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
 
+#include <iostream>
+
 using namespace clang;
 using namespace clang::tooling;
 using namespace llvm;
@@ -16,20 +18,20 @@ static cl::opt<std::string> MyToolOutput("o", cl::desc("Output file"), cl::cat(M
 static cl::opt<bool> LoopsVectorization("lv", cl::desc("Loops vectorization"), cl::cat(MyToolCategory));
 
 
-const char loops[] = "for (Int _j = 0; _j < _size.y; _j++) {\n"
-                     "for (Int _i = 0; _i < _size.x; _i++) {\n"
+const char loops[] = "for (Int _j = 0; _j < _sizeY; _j++) {\n"
+                     "for (Int _i = 0; _i < _sizeX; _i++) {\n"
                      "_evaluate(_i, _j, Real());\n"
                      "}\n"
                      "}\n";
 
 
 const char vecLoops[] =
-        "for (Int _j = 0; _j < _size.y; _j++) {\n"
+        "for (Int _j = 0; _j < _sizeY; _j++) {\n"
         "Int _i = 0;\n"
-        "for (; _i < _size.x / 4 * 4; _i+=4) {\n"
+        "for (; _i < _sizeX / 4 * 4; _i+=4) {\n"
         "_evaluate(_i, _j, Real4());\n"
         "}\n"
-        "for (; _i < _size.x; _i++) {\n"
+        "for (; _i < _sizeX; _i++) {\n"
         "_evaluate(_i, _j, Real());\n"
         "}\n"
         "}\n";
@@ -118,7 +120,6 @@ public:
         if (e->getNameInfo().getAsString() == "operator,") {
             mRewriter.ReplaceText(e->getSourceRange(), ";");
         }
-
         return true;
     }
     
@@ -137,6 +138,23 @@ private:
     Rewriter& mRewriter;
 };
 
+template <typename T>
+std::vector<const T*> findCurrentChildrens(const Stmt* parent) {
+    std::vector<const T*> findedChildrens;
+    auto parentChildrens =  parent->children();
+
+    for(const Stmt* parentChild : parentChildrens) {
+        if(dyn_cast<T>(parentChild) != nullptr) {
+            const T* findedChild = dyn_cast<const T>(parentChild);
+            findedChildrens.push_back(findedChild);
+        }
+        if(parentChild->children().begin() != parentChild->children().end()) {
+           std::vector<const T*> childChildrens = findCurrentChildrens<T>(parentChild);
+            findedChildrens.insert(findedChildrens.end(), childChildrens.begin(), childChildrens.end());
+        }
+    }
+    return findedChildrens;
+}
 
 class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
 public:
@@ -145,12 +163,19 @@ public:
     {
     }
 
-
     bool VisitVarDecl(VarDecl *v) {
         if (v->getType().getAsString() == "struct Temp") {
 //            auto r = v->getTypeSourceInfo()->getTypeLoc().getSourceRange();
 //            mRewriter.ReplaceText(r, "Real");
             mRewriter.RemoveText(v->getSourceRange());
+        }
+        return true;
+    }
+
+    bool VisitDeclRefExpr(DeclRefExpr* e) {
+        if(e->getType().getAsString() == "struct Size") {
+            auto r = e->getSourceRange();
+            mRewriter.ReplaceText(r, "_sizeX, _sizeY");
         }
         return true;
     }
@@ -181,7 +206,6 @@ public:
             }
             mRewriter.InsertText(f->getBeginLoc(), ">\n", true, true);
         }
-
         return true;
     }
 
@@ -223,14 +247,20 @@ public:
                 mRewriter.InsertText(begin, ss, true, true);
             }
 
+
             // find iteration space size
-            auto sizeStr = (Twine("Size _size = ") + temporaryName(*sv.allVars().begin()) + ".range().size();\n").str();
-            mRewriter.InsertText(begin, sizeStr, true, true);
+            auto sizeXStr = (Twine("Int _sizeX = ") + temporaryName(*sv.allVars().begin()) + ".range().size().x;\n").str();
+            mRewriter.InsertText(begin, sizeXStr, true, true);
+
+            auto sizeYStr = (Twine("Int _sizeY = ") + temporaryName(*sv.allVars().begin()) + ".range().size().y;\n").str();
+            mRewriter.InsertText(begin, sizeYStr, true, true);
 
             // add assertions
             for (auto& e : sv.allVars()) {
-                std::string ss = (Twine("assert(") + temporaryName(e) + ".range().size() == _size);\n").str();
-                mRewriter.InsertText(begin, ss, true, true);
+                std::string ssX = (Twine("assert(") +  temporaryName(e)  + ".range().size().x == _sizeX);\n").str();
+                mRewriter.InsertText(begin, ssX, true, true);
+                std::string ssY = (Twine("assert(") +  temporaryName(e)  + ".range().size().y == _sizeY);\n").str();
+                mRewriter.InsertText(begin, ssY, true, true);
             }
 
             // add expression lambda
@@ -283,11 +313,42 @@ public:
             }
 
             mRewriter.InsertText(end, "}\n", true, true);
-
             return true;
+
+        } else if(e && isa<DeclStmt>(e))
+        {
+            DeclStmt* declStmt = dyn_cast<DeclStmt>(e);
+            DeclGroupRef declGroup = declStmt->getDeclGroup();
+
+            //DeclStmt has childrens - VarDecl (ex. int i, j, k; => three VarDecl)
+            for(auto decl : declGroup) {
+                if(isa<VarDecl>(decl) && dyn_cast<VarDecl>(decl)->getType().getAsString() == "struct Size"
+                        && dyn_cast<VarDecl>(decl)->getAnyInitializer() != nullptr) {
+                    auto r = e->getSourceRange();
+                    VarDecl* v = dyn_cast<VarDecl>(decl);
+                    const Expr* e = v->getInit();//v->getAnyInitializer();
+                    std::vector<const DeclRefExpr*> refExpr = findCurrentChildrens<DeclRefExpr>(cast<Stmt>(e));
+
+                    std::vector<std::string> rValueNames;
+                    for (auto ref : refExpr) {
+                        std::string s = Lexer::getSourceText(
+                                    CharSourceRange::getTokenRange(ref->getSourceRange()),
+                                    mRewriter.getSourceMgr(),
+                                    LangOptions());
+                        rValueNames.push_back(s);
+                    }
+
+                    auto sizeXStr = (Twine("Int _sizeX = ") + rValueNames[0] + ";\n").str();
+                    auto sizeYStr = (Twine("Int _sizeY = ") + rValueNames[1] + ";\n").str();
+                    mRewriter.ReplaceText(r, sizeXStr + sizeYStr);
+                }
+            }
+            return RecursiveASTVisitor<MyASTVisitor>::TraverseStmt(e);
+
         } else {
             return RecursiveASTVisitor<MyASTVisitor>::TraverseStmt(e);
         }
+        return true;
     }
 
 private:
