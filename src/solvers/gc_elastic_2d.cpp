@@ -160,9 +160,44 @@ int main(int argc, char** argv) {
         w3i = + vyi * icsi + sxyi * imui,
         w4i = - vyi * icsi + sxyi * imui;
 
+        DefineLoop([time_steps, size](int Nx, int Ny) { //start 1
+            for(Int t = 0; t < time_steps; t++) {
+                for(Int j = 0; j < size.y; j++) {
+                    for(Int i = 0; i < size.x; i++) {
+                        LoopSequence(0)(i, j); // save 1
+                    }
+                    for(Int i = 0; i < size.x; i++) {
+                        LoopSequence(1)(i+1, j+1); // save 2
+                    }
+                }
+            }
+        }) + //start 2
+        [&]() { //apply DefinedLoop with only save 1
+            w1i = + vxi * icpi + sxxi * ilmi;
+            w2i = - vxi * icpi + sxxi * ilmi;
+            w3i = + vyi * icsi + sxyi * imui;
+            w4i = - vyi * icsi + sxyi * imui;
+        } + //start 3
+        [&]() { //apply DefinedLoop with only save 2
+            c1 = cpi * dt / dx;
+            c2 = csi * dt / dx;
+
+            dw1 = advection(c1, w1i.dx(-2), w1i.dx(-1), w1i, w1i.dx(+1), w1i.dx(+2));
+            dw2 = advection(c1, w2i.dx(+2), w2i.dx(+1), w2i, w2i.dx(-1), w2i.dx(-2));
+            dw3 = advection(c2, w3i.dx(-2), w3i.dx(-1), w3i, w3i.dx(+1), w3i.dx(+2));
+            dw4 = advection(c2, w4i.dx(+2), w4i.dx(+1), w4i, w4i.dx(-1), w4i.dx(-2));
+
+            vxi += cpi * (dw1 - dw2);
+            vyi += csi * (dw3 - dw4);
+            sxxi += lmi * (dw1 + dw2);
+            syyi += lai * (dw1 + dw2);
+            sxyi += mui * (dw3 + dw4);
+        };
+
         // omega_x_solve
         c1 = cpi * dt / dx,
         c2 = csi * dt / dx,
+
 
 //        dw1 = advection(c1, w1i.dx(+2), w1i.dx(+1), w1i, w1i.dx(-1), w1i.dx(-2)),
 //        dw2 = advection(c1, w2i.dx(-2), w2i.dx(-1), w2i, w2i.dx(+1), w2i.dx(+2)),
@@ -180,6 +215,7 @@ int main(int argc, char** argv) {
         sxxi += lmi * (dw1 + dw2),
         syyi += lai * (dw1 + dw2),
         sxyi += mui * (dw3 + dw4);
+
 
         // to_omega_y
         w1i = + vyi * icpi + syyi * ilmi,

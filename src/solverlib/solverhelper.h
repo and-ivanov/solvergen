@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cmath>
 #include <algorithm>
+#include <functional>
 
 #ifndef NDEBUG
 #include <fenv.h>
@@ -150,9 +151,6 @@ struct Array {
     Size mSize;
     std::vector<Real> mData;
 };
-
-
-
 
 
 struct Var {
@@ -363,6 +361,20 @@ struct Real4 {
     }
 
     Vec4d val;
+};
+
+class DefineLoop {
+public:
+    explicit DefineLoop(void (*)(int, int))  {}
+    DefineLoop() {}
+    DefineLoop operator+(void (*)(void)) { return DefineLoop(); }
+
+};
+
+class LoopSequence {
+public:
+    LoopSequence(int) {}
+    void operator()(int, int) {}
 };
 
 

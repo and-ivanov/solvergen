@@ -9,8 +9,14 @@
 
 #include <iostream>
 
+#include <clang/AST/ASTContext.h>
+
+#include "clang/ASTMatchers/ASTMatchers.h"
+#include "clang/ASTMatchers/ASTMatchFinder.h"
+
 using namespace clang;
 using namespace clang::tooling;
+using namespace clang::ast_matchers;
 using namespace llvm;
 
 static cl::OptionCategory MyToolCategory("My tool options");
@@ -158,8 +164,9 @@ std::vector<const T*> findCurrentChildrens(const Stmt* parent) {
 
 class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
 public:
-    MyASTVisitor(Rewriter& rewriter)
+    MyASTVisitor(Rewriter& rewriter, ASTContext* context)
         : mRewriter(rewriter)
+        , mContext(context)
     {
     }
 
@@ -173,11 +180,18 @@ public:
     }
 
     bool VisitDeclRefExpr(DeclRefExpr* e) {
+        //need change! Error in: for(Int _j = 0; _j < size.y; _j+=4)
         if(e->getType().getAsString() == "struct Size") {
             auto r = e->getSourceRange();
             mRewriter.ReplaceText(r, "_sizeX, _sizeY");
         }
         return true;
+    }
+
+    bool VisitVarDecl(VarDecl *v) {
+        if (v->hasLocalStorage()) {
+
+        }
     }
 
     bool VisitFunctionDecl(FunctionDecl *f) {
@@ -305,12 +319,23 @@ public:
             // add closing brace of lambda
             mRewriter.InsertText(end, "};\n", true, true);
 
-            // insert loops with call to lambda
-            if (LoopsVectorization.getValue()) {
-                mRewriter.InsertText(end, vecLoops, true, true);
-            } else {
-                mRewriter.InsertText(end, loops, true, true);
-            }
+//            const Expr& currentNodeStmt = *expr;
+//            ASTContext::DynTypedNodeList parentList = mContext->getParents(currentNodeStmt);
+//            int count = 0;
+//            for(auto nodeParent : parentList) {
+//                nodeParent.get<ForStmt>();
+//                count++;
+//            }
+           std::cout << "Node " << expr->getStmtClassName() << std::endl;
+
+            //if(expr->getStmtClassName() ) {
+                // insert loops with call to lambda
+                if (LoopsVectorization.getValue()) {
+                    mRewriter.InsertText(end, vecLoops, true, true);
+                } else {
+                    mRewriter.InsertText(end, loops, true, true);
+                }
+            //}
 
             mRewriter.InsertText(end, "}\n", true, true);
             return true;
@@ -326,6 +351,7 @@ public:
                         && dyn_cast<VarDecl>(decl)->getAnyInitializer() != nullptr) {
                     auto r = e->getSourceRange();
                     VarDecl* v = dyn_cast<VarDecl>(decl);
+
                     const Expr* e = v->getInit();//v->getAnyInitializer();
                     std::vector<const DeclRefExpr*> refExpr = findCurrentChildrens<DeclRefExpr>(cast<Stmt>(e));
 
@@ -353,14 +379,30 @@ public:
 
 private:
     Rewriter& mRewriter;
+    ASTContext* mContext;
+};
+
+class ForLoopHandler : public MatchFinder::MatchCallback {
+public:
+    ForLoopHandler(Rewriter& rewriter) : mRewriter(rewriter) {}
+
+    virtual void run(const MatchFinder::MatchResult& result) {
+
+    }
+
+private:
+    Rewriter& mRewriter;
 };
 
 class MyASTConsumer : public ASTConsumer {
 public:
-    MyASTConsumer(Rewriter& rewriter)
-        : mVisitor(rewriter)
+    MyASTConsumer(Rewriter& rewriter, ASTContext *context)
+        : mVisitor(rewriter, context)
     {
-
+        //mMatcher.addMatcher(..., &mForLoopHandler);
+        mMatcher.addMatcher(
+                    hasLoopVariable()
+                    expr(hasType(asString("struct Sequence"))) , );
     }
 
     bool HandleTopLevelDecl(DeclGroupRef dr) override {
@@ -370,8 +412,13 @@ public:
         return true;
     }
 
+    void HandleTranslationUnit(ASTContext& context) override {
+        mMatcher.matchAST(context);
+    }
+
 private:
     MyASTVisitor mVisitor;
+    MatchFinder mMatcher;
 };
 
 class MyFrontendAction : public ASTFrontendAction {
@@ -393,7 +440,7 @@ public:
     {
         llvm::errs() << "** Creating AST consumer for: " << file << "\n";
         mRewriter.setSourceMgr(ci.getSourceManager(), ci.getLangOpts());
-        return llvm::make_unique<MyASTConsumer>(mRewriter);
+        return llvm::make_unique<MyASTConsumer>(mRewriter, &ci.getASTContext());
     }
 private:
     Rewriter mRewriter;
