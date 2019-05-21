@@ -1,6 +1,162 @@
 #include "solverhelper.h"
 #include "hrdata/hrdata.h"
 
+template <typename T>
+inline T pow2(T k) {
+    return 1ll << k;
+}
+
+template <typename F>
+void tiledLoops(int nx, int ny, int nt, F func) {
+    std::array<int8_t,24> lut_ii{
+        0, 1,-1, 0, 0, 1, 1,-1,-1, 1,-1, 0, 0, 0, 1,-1, 0, 0, 0, 0, 0, 0, 1,-1
+    };
+    std::array<int8_t,24> lut_jj{
+        0, 0, 0, 1,-1, 1,-1, 1,-1, 0, 0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 0, 0, 0
+    };
+    std::array<int8_t,24> lut_tt{
+        0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1
+    };
+    std::array<int8_t,24> lut_mode {
+        0,19,19,14,14, 0, 0, 0, 0,14,14,19,19, 0,14,14, 0,14,14,19,19, 0,19,19
+    };
+
+    int base = std::max(nx, ny);
+    base = base | 1; // round up to the nearest odd number
+    int height = nt;
+
+    int32_t tileParam = 1;
+    while (pow2(tileParam+1) < base + height - 1) {
+        tileParam++;
+    }
+    assert(pow2(tileParam+1) >= base + height - 1);
+    //cerr << "tileParam: " << tileParam << endl;
+
+    int32_t sx = - base / 2;
+    //cerr << "sx: " << sx << endl;
+    int32_t ex = sx + nx - 1;
+    //cerr << "ex: " << ex << endl;
+
+    int32_t sy = - base / 2;
+    //cerr << "sy: " << sy << endl;
+    int32_t ey = sy + ny - 1;
+    //cerr << "ey: " << ey << endl;
+
+    int32_t st = + base / 2;
+    //cerr << "st: " << st << endl;
+    int32_t et = st + nt - 1;
+    //cerr << "et: " << et << endl;
+
+    // size of array is the logarithm of desired tile size
+    std::vector<int8_t> state(tileParam);
+
+    // height of the tile depends on the number of iterations:
+    // num of iterations: 2^{3i+1}-2^i
+    // i from 1 to inf
+    // height big: 2^{i+1} ( range: [0;2^{i+1}-1] )
+    // height small: 2^i ( range: [0;2^i-1] )
+    // width: 2^{i+1} - 1 ( range: [-(2^i - 1); +(2^i - 1)] )
+    int64_t iterations = pow2(3ll * tileParam + 1ll) - pow2(tileParam);
+    //iterations = 20;
+    //cerr << "iterations: " << iterations << endl;
+
+    std::vector<int32_t> tts(tileParam + 1);
+    std::vector<int32_t> iis(tileParam + 1);
+    std::vector<int32_t> jjs(tileParam + 1);
+
+    size_t K = state.size() - 1;
+
+    bool finished = false;
+    while (1) {
+
+        //cerr << "=====" << endl;
+        // step
+
+        //for (int i = 0; i < state.size(); i++) {
+        //    cerr << int(state[i]) << " ";
+        //}
+        //cerr << endl;
+
+        bool skipTile = false;
+        while (1) {
+            int32_t ss = state[K];
+
+            int32_t tt = lut_tt[ss];
+            int32_t ii = lut_ii[ss];
+            int32_t jj = lut_jj[ss];
+
+            tts[K] = tts[K+1] + (tt << K);
+            iis[K] = iis[K+1] + (ii << K);
+            jjs[K] = jjs[K+1] + (jj << K);
+
+            int32_t min_t = tts[K] + 0;
+            int32_t min_x = iis[K] - (pow2(K + 1) - 1);
+            int32_t min_y = jjs[K] - (pow2(K + 1) - 1);
+
+            int32_t mode = lut_mode[ss];
+            int32_t height = pow2(K + (mode == 0 ? 2 : 1)) - 1;
+
+            int32_t max_t = tts[K] + height - 1;
+            int32_t max_x = iis[K] + (pow2(K + 1) - 1);
+            int32_t max_y = jjs[K] + (pow2(K + 1) - 1);
+
+            //cerr
+            //    << min_x << " "
+            //    << max_x << " "
+            //    << min_y << " "
+            //    << max_y << " "
+            //    << min_t << " "
+            //    << max_t << " "
+            //    << endl;
+
+            if (max_t < st || min_t > et ||
+                max_x < sx || min_x > ex ||
+                max_y < sy || min_y > ey)
+            {
+                skipTile = true;
+                break;
+            }
+
+            if (K == 0) break;
+
+            state[K-1] = lut_mode[state[K]];
+
+            K--;
+        };
+
+        //cerr << "skipTile: " << skipTile << endl;
+        //cerr << "ijt: " << iis[0] << " " << jjs[0] << " " << tts[0] << endl;
+
+        if (!skipTile) {
+
+            // print
+            if (sx <= iis[0] && iis[0] <= ex &&
+                sy <= jjs[0] && jjs[0] <= ey) {
+                if (st <= tts[0] && tts[0] <= et) {
+                    func(iis[0] - sx, jjs[0] - sy, tts[0] - st);
+                }
+                if (lut_mode[state[0]] == 0) {
+                    if(st <= tts[0] + 1 && tts[0] + 1 <= et) {
+                        func(iis[0] - sx, jjs[0] - sy, tts[0] + 1 - st);
+                    }
+                }
+            }
+
+        }
+
+        while (state[K] == 13 || state[K] == 18 || state[K] == 23) {
+            K++;
+            if (K == state.size()) { finished = true; break; }
+        }
+        if (finished == true) break;
+
+        state[K]++;
+
+
+    }
+
+}
+
 void extend_ghost(Var a, Int gh, Int gnx, Int gny) {
     for (Int i = 0; i < gh; i++) {
         {
@@ -683,8 +839,7 @@ Int _sizeY = gny;
         assert(t_w4i.range().size().x == _sizeX);
         assert(t_w4i.range().size().y == _sizeY);
         auto _evaluateX1 =
-                [&t_icpi,&t_icsi,&t_ilmi,&t_imui,&t_sxxi,&t_sxyi,
-                &t_vxi,&t_vyi,&t_w1i,&t_w2i,&t_w3i,&t_w4i]
+                [&]
                 (Int _i, Int _j, auto type) __attribute__((always_inline)) {
         using T = decltype(type);
         // temporaries
@@ -828,40 +983,7 @@ Int _sizeY = gny;
         assert(t_w4i_dx_m2_.range().size().x == _sizeX);
         assert(t_w4i_dx_m2_.range().size().y == _sizeY);
         auto _evaluateX2 =
-                [
-                &t_cpi,
-                &t_csi,
-                &t_lai,
-                &t_lmi,
-                &t_mui,
-                &t_sxxi,
-                &t_sxyi,
-                &t_syyi,
-                &t_vxi,
-                &t_vyi,
-                &t_w1i,
-                &t_w1i_dx_p1_,
-                &t_w1i_dx_p2_,
-                &t_w1i_dx_m1_,
-                &t_w1i_dx_m2_,
-                &t_w2i,
-                &t_w2i_dx_p1_,
-                &t_w2i_dx_p2_,
-                &t_w2i_dx_m1_,
-                &t_w2i_dx_m2_,
-                &t_w3i,
-                &t_w3i_dx_p1_,
-                &t_w3i_dx_p2_,
-                &t_w3i_dx_m1_,
-                &t_w3i_dx_m2_,
-                &t_w4i,
-                &t_w4i_dx_p1_,
-                &t_w4i_dx_p2_,
-                &t_w4i_dx_m1_,
-                &t_w4i_dx_m2_,
-                dt,dx
-                ]
-                (Int _i, Int _j, auto type) __attribute__((always_inline)) {
+                [&] (Int _i, Int _j, auto type) __attribute__((always_inline)) {
         using T = decltype(type);
         // temporaries
         T _c1;
@@ -1002,20 +1124,7 @@ Int _sizeY = gny;
         assert(t_w3i.range().size().y == _sizeY);
         assert(t_w4i.range().size().x == _sizeX);
         assert(t_w4i.range().size().y == _sizeY);
-        auto _evaluateY1 = [
-                &t_icpi,
-                &t_icsi,
-                &t_ilmi,
-                &t_imui,
-                &t_sxyi,
-                &t_syyi,
-                &t_vxi,
-                &t_vyi,
-                &t_w1i,
-                &t_w2i,
-                &t_w3i,
-                &t_w4i
-                ]
+        auto _evaluateY1 = [&]
                 (Int _i, Int _j, auto type) __attribute__((always_inline)) {
         using T = decltype(type);
         // temporaries
@@ -1266,44 +1375,66 @@ Int _sizeY = gny;
 //            }
 //        });
 
-        for (Int t = 0; t < time_steps; t++) {
-            for (Int j = 0; j < _sizeY; j++) {
-                Int i = 0;
-                for (; i < _sizeX / 4 * 4; i+=4) {
-                    _evaluateX1(i, j, Real4());
-                }
-                for (; i < _sizeX; i++) {
-                    _evaluateX1(i, j, Real());
-                }
+        tiledLoops(_sizeX / 2, _sizeY / 2, time_steps * 4,
+                   [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
+                   (int i, int j, int t) __attribute__((always_inline)) {
+            switch(t % 4) {
+            case 0:
+                _evaluateX1(2*i, 2*j, Real());
+                _evaluateX1(2*i+1, 2*j, Real());
+                _evaluateX1(2*i, 2*j+1, Real());
+                _evaluateX1(2*i+1, 2*j+1, Real());
+                break;
+            case 1:
+                _evaluateX2(2*i, 2*j, Real());
+                _evaluateX2(2*i+1, 2*j, Real());
+                _evaluateX2(2*i, 2*j+1, Real());
+                _evaluateX2(2*i+1, 2*j+1, Real());
+
+                break;
+
+            case 2:
+                _evaluateY1(2*i, 2*j, Real());
+                _evaluateY1(2*i+1, 2*j, Real());
+                _evaluateY1(2*i, 2*j+1, Real());
+                _evaluateY1(2*i+1, 2*j+1, Real());
+
+
+                break;
+
+            case 3:
+                _evaluateY2(2*i, 2*j, Real());
+                _evaluateY2(2*i+1, 2*j, Real());
+                _evaluateY2(2*i, 2*j+1, Real());
+                _evaluateY2(2*i+1, 2*j+1, Real());
+
+                break;
+
             }
-            for (Int j = 0; j < _sizeY; j++) {
-                Int i = 0;
-                for (; i < _sizeX / 4 * 4; i+=4) {
-                    _evaluateX2(i, j, Real4());
-                }
-                for (; i < _sizeX; i++) {
-                    _evaluateX2(i, j, Real());
-                }
-            }
-            for (Int j = 0; j < _sizeY; j++) {
-                Int i = 0;
-                for (; i < _sizeX / 4 * 4; i+=4) {
-                    _evaluateY1(i, j, Real4());
-                }
-                for (; i < _sizeX; i++) {
-                    _evaluateY1(i, j, Real());
-                }
-            }
-            for (Int j = 0; j < _sizeY; j++) {
-                Int i = 0;
-                for (; i < _sizeX / 4 * 4; i+=4) {
-                    _evaluateY2(i, j, Real4());
-                }
-                for (; i < _sizeX; i++) {
-                    _evaluateY2(i, j, Real());
-                }
-            }
-        }
+        });
+
+//        for (Int t = 0; t < time_steps; t++) {
+//            for (Int j = 0; j < _sizeY; j++) {
+//                for (Int i = 0; i < _sizeX; i++) {
+//                    _evaluateX1(i, j, Real());
+//                }
+//            }
+//            for (Int j = 0; j < _sizeY; j++) {
+//                for (Int i = 0; i < _sizeX; i++) {
+//                    _evaluateX2(i, j, Real());
+//                }
+//            }
+//            for (Int j = 0; j < _sizeY; j++) {
+//                for (Int i = 0; i < _sizeX; i++) {
+//                    _evaluateY1(i, j, Real());
+//                }
+//            }
+//            for (Int j = 0; j < _sizeY; j++) {
+//                for (Int i = 0; i < _sizeX; i++) {
+//                    _evaluateY2(i, j, Real());
+//                }
+//            }
+//        }
     }
 
     vxa.save(save_path + "/vx_" + withLeadingZeros(time_steps, 6) + ".bin");
