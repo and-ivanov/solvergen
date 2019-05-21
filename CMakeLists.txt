@@ -120,5 +120,10 @@ add_solver(gc_elastic_2d)
 add_solver(gc_elastic_2d_from_le2d)
 add_solver(fd_scalar_wave_2d)
 
+add_executable(gc_elastic_2d_tiled
+    ../solvergen/testscripts/gc_elastic_2d_tiled.cpp
+)
+target_link_libraries(gc_elastic_2d_tiled hrdata solver_lib)
+
 
 
