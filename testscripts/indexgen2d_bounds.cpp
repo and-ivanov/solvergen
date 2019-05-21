@@ -64,9 +64,9 @@ int main() {
         0,19,19,14,14, 0, 0, 0, 0,14,14,19,19, 0,14,14, 0,14,14,19,19, 0,19,19
     };
     
-    int nx = 13;
-    int ny = 7;
-    int nt = 19;
+    int nx = 50;
+    int ny = 40;
+    int nt = 30;
     
     int base = max(nx, ny);
     base = base | 1; // round up to the nearest odd number
@@ -111,7 +111,7 @@ int main() {
     std::vector<int32_t> iis(tileParam + 1);
     std::vector<int32_t> jjs(tileParam + 1);
     
-    size_t K = 0;
+    size_t K = state.size() - 1;
     
     bool finished = false;
     while (1) {
@@ -178,17 +178,14 @@ int main() {
 
             // print
             if (sx <= iis[0] && iis[0] <= ex &&
-                sy <= jjs[0] && jjs[0] <= ey &&
-                st <= tts[0] && tts[0] <= et)
-            {
-                print(iis[0] - sx, jjs[0] - sy, tts[0] - st);
-            }
-            if (lut_mode[state[0]] == 0) {
-            if (sx <= iis[0] && iis[0] <= ex &&
-                sy <= jjs[0] && jjs[0] <= ey &&
-                st <= tts[0] + 1 && tts[0] + 1 <= et)
-                {
-                    print(iis[0] - sx, jjs[0] - sy, tts[0] + 1 - st);
+                sy <= jjs[0] && jjs[0] <= ey) {
+                if (st <= tts[0] && tts[0] <= et) {
+                    print(iis[0] - sx, jjs[0] - sy, tts[0] - st);
+                }
+                if (lut_mode[state[0]] == 0) {
+                    if(st <= tts[0] + 1 && tts[0] + 1 <= et) {
+                        print(iis[0] - sx, jjs[0] - sy, tts[0] + 1 - st);
+                    }
                 }
             }
 
