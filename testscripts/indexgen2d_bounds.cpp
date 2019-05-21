@@ -39,9 +39,9 @@ bool check(int i, int j, int t) {
 volatile int unused = 0;
 
 void print(int i, int j, int t) {
-  std::cout << i << " " << j << " " << t << endl;
+    std::cout << i << " " << j << " " << t << endl;
 //    cerr << "ijt: " << i << " " << j << " " << t << endl;
-  //assert(check(i, j, t));
+    assert(check(i, j, t));
     unused += i + j + t;
 }
 
@@ -64,15 +64,15 @@ int main() {
         0,19,19,14,14, 0, 0, 0, 0,14,14,19,19, 0,14,14, 0,14,14,19,19, 0,19,19
     };
     
-    int nx = 1000;
-    int ny = 1000;
-    int nt = 100;
+    int nx = 13;
+    int ny = 7;
+    int nt = 19;
     
     int base = max(nx, ny);
-    base = base | 1;
+    base = base | 1; // round up to the nearest odd number
     int height = nt;
     
-    int64_t tileParam = 1;
+    int32_t tileParam = 1;
     while (pow2(tileParam+1) < base + height - 1) {
         tileParam++;
     }
@@ -124,7 +124,7 @@ int main() {
         //}
         //cerr << endl;
 
-        bool goToNextState = false;
+        bool skipTile = false;
         while (1) {
             int32_t ss = state[K];
 
@@ -160,18 +160,21 @@ int main() {
                 max_x < sx || min_x > ex || 
                 max_y < sy || min_y > ey) 
             {
-                goToNextState = true;
+                skipTile = true;
                 break;
             }
 
             if (K == 0) break; 
+
+            state[K-1] = lut_mode[state[K]];
+            
             K--;
         };
 
-        //cerr << "goToNextState: " << goToNextState << endl;
+        //cerr << "skipTile: " << skipTile << endl;
         //cerr << "ijt: " << iis[0] << " " << jjs[0] << " " << tts[0] << endl;
 
-        if (!goToNextState) {
+        if (!skipTile) {
 
             // print
             if (sx <= iis[0] && iis[0] <= ex &&
@@ -198,11 +201,6 @@ int main() {
         if (finished == true) break;
 
         state[K]++;
-
-        for (size_t kk = K; kk > 0; kk--) {
-              int8_t mode = lut_mode[state[kk]];
-              state[kk-1] = mode;
-        }
 
 
     }
