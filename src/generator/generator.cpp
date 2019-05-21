@@ -401,8 +401,23 @@ public:
     {
         //mMatcher.addMatcher(..., &mForLoopHandler);
         mMatcher.addMatcher(
-                    hasLoopVariable()
-                    expr(hasType(asString("struct Sequence"))) , );
+                    expr(hasName("struct DefineLoop")
+                         ));
+//        Matcher.addMatcher(
+//              forStmt(hasLoopInit(declStmt(hasSingleDecl(
+//                         varDecl(hasInitializer(integerLiteral(equals(0))))
+//                              .bind("initVarName")))),
+//                      hasIncrement(unaryOperator(
+//                          hasOperatorName("++"),
+//                          hasUnaryOperand(declRefExpr(to(
+//                              varDecl(hasType(isInteger())).bind("incVarName")))))),
+//                      hasCondition(binaryOperator(
+//                          hasOperatorName("<"),
+//                          hasLHS(ignoringParenImpCasts(declRefExpr(to(
+//                              varDecl(hasType(isInteger())).bind("condVarName"))))),
+//                          hasRHS(expr(hasType(isInteger()))))))
+//                  .bind("forLoop"),
+//      &HandlerForFor);
     }
 
     bool HandleTopLevelDecl(DeclGroupRef dr) override {

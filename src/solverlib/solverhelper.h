@@ -365,9 +365,11 @@ struct Real4 {
 
 class DefineLoop {
 public:
-    explicit DefineLoop(void (*)(int, int))  {}
+    using DefineLoopFn = std::function<void(int, int)>;
+    using rhsFn = std::function<void()>;
+    DefineLoop(DefineLoopFn)  {}
     DefineLoop() {}
-    DefineLoop operator+(void (*)(void)) { return DefineLoop(); }
+    DefineLoop operator+(rhsFn) { return DefineLoop(); }
 
 };
 
