@@ -94,6 +94,8 @@ function(add_solver solver)
     # add entry to compilation database
     add_executable(${solver}-dummy "${CMAKE_CURRENT_SOURCE_DIR}/src/solvers/${solver}.cpp")
     target_link_libraries(${solver}-dummy hrdata solver_lib)
+    target_compile_options(${solver}-dummy PRIVATE -march=native) # enables vector instructions
+
 
     add_custom_command(
         OUTPUT ${solver}.gen.cpp

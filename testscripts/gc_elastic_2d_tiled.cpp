@@ -1,6 +1,156 @@
 #include "solverhelper.h"
 #include "hrdata/hrdata.h"
 
+#include <chrono>
+
+
+template <typename F>
+void largeTile(int ox, int oy, int ot,
+        int nx, int ny, int nt, int smallTileHeight, F func)
+{
+    int largeTileHeight = smallTileHeight * 2;
+    for (int t = max(0, ot); t < min(nt, ot + largeTileHeight); t++) {
+        int at = t - ot;
+        int halfWidth = std::min(at, largeTileHeight - at - 1);
+        for (int j = max(0, oy - halfWidth); j <= min(ny - 1, oy + halfWidth); j++) {
+            for (int i = max(0, ox - halfWidth); i <= min(nx - 1, ox + halfWidth); i++) {
+                func(i, j, t);
+            }
+        }
+    }
+}
+
+template <typename F>
+void smallTileX(int ox, int oy, int ot,
+        int nx, int ny, int nt, int smallTileHeight, F func)
+{
+    int largeTileHeight = smallTileHeight * 2;
+    //cerr << "small tile x" << endl;
+    for (int t = max(0, ot); t < min(nt, ot + smallTileHeight); t++) {
+        //cerr << "t: " << t << endl;
+        int at = t - ot;
+        //cerr << "at: " << at << endl;
+        int halfWidthX = smallTileHeight - at - 1;
+        int halfWidthY = at;
+        //cerr << "halfWidthX: " << halfWidthX << endl;
+        //cerr << "halfWidthY: " << halfWidthY << endl;
+        for (int j = max(0, oy - halfWidthY); j <= min(ny - 1, oy + halfWidthY); j++) {
+            for (int i = max(0, ox - halfWidthX); i <= min(nx - 1, ox + halfWidthX); i++) {
+                func(i, j, t);
+            }
+        }
+    }
+}
+
+template <typename F>
+void smallTileY(int ox, int oy, int ot,
+        int nx, int ny, int nt, int smallTileHeight, F func)
+{
+    int largeTileHeight = smallTileHeight * 2;
+    for (int t = max(0, ot); t < min(nt, ot + smallTileHeight); t++) {
+        int at = t - ot;
+        int halfWidthX = at;
+        int halfWidthY = smallTileHeight - at - 1;
+        for (int j = max(0, oy - halfWidthY); j <= min(ny - 1, oy + halfWidthY); j++) {
+            for (int i = max(0, ox - halfWidthX); i <= min(nx - 1, ox + halfWidthX); i++) {
+                func(i, j, t);
+            }
+        }
+    }
+}
+
+template <typename F>
+void fixedTiledLoops(int nx, int ny, int nt, int smallTileHeight, F func) {
+    int largeTileHeight = smallTileHeight * 2;
+    int ntt = (nt - 1) / largeTileHeight + 1;
+    int nxx = (nx - 1) / largeTileHeight + 1;
+    int nyy = (ny - 1) / largeTileHeight + 1;
+
+    // because tiles will not cover the last layers
+    ntt++;
+    nxx++;
+    nyy++;
+
+    for (int tt = 0; tt < ntt; tt++) {
+        int ot = tt * largeTileHeight;
+
+        //cerr << "L1" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                largeTile(
+                        ox + smallTileHeight,
+                        oy + smallTileHeight,
+                        ot - smallTileHeight,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "X1" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                smallTileX(
+                        ox + smallTileHeight,
+                        oy,
+                        ot,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "Y1" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                smallTileY(
+                        ox,
+                        oy + smallTileHeight,
+                        ot,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "L2" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                largeTile(
+                        ox,
+                        oy,
+                        ot,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "X2" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                smallTileX(
+                        ox,
+                        oy + smallTileHeight,
+                        ot + smallTileHeight,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "X2" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                smallTileY(
+                        ox + smallTileHeight,
+                        oy,
+                        ot + smallTileHeight,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+    }
+
+
+}
+
 template <typename T>
 inline T pow2(T k) {
     return 1ll << k;
@@ -293,15 +443,19 @@ void extend_ghost(Var a, Int gh, Int gnx, Int gny) {
 }
 
 template <typename E0>
+__attribute__((always_inline,flatten))
 inline bool isNull(E0 a) { return -RealEps < a && a < RealEps; }
 
 template <typename E0>
+__attribute__((always_inline,flatten))
 inline auto limiter(E0 r) {
     return max(0.0, max(min(1.0, 2.0 * r), min(2.0, r)));
 }
 
 template <typename E0, typename E1, typename E2, typename E3, typename E4, typename E5>
-inline auto advection(E0 c, E1 ppu, E2 pu, E3 u, E4 nu, E5 nnu) {
+__attribute__((always_inline,flatten))
+inline auto advection(E0 c, E1 ppu, E2 pu, E3 u, E4 nu, E5 nnu)
+{
 //    return - c * (u - pu);
 
     auto r1 = u - pu;
@@ -840,7 +994,9 @@ Int _sizeY = gny;
         assert(t_w4i.range().size().y == _sizeY);
         auto _evaluateX1 =
                 [&]
-                (Int _i, Int _j, auto type) __attribute__((always_inline)) {
+                (Int _i, Int _j, auto type)
+                __attribute__((always_inline,flatten))
+        {
         using T = decltype(type);
         // temporaries
         // variables
@@ -983,7 +1139,9 @@ Int _sizeY = gny;
         assert(t_w4i_dx_m2_.range().size().x == _sizeX);
         assert(t_w4i_dx_m2_.range().size().y == _sizeY);
         auto _evaluateX2 =
-                [&] (Int _i, Int _j, auto type) __attribute__((always_inline)) {
+                [&] (Int _i, Int _j, auto type)
+                __attribute__((always_inline,flatten))
+        {
         using T = decltype(type);
         // temporaries
         T _c1;
@@ -1125,7 +1283,9 @@ Int _sizeY = gny;
         assert(t_w4i.range().size().x == _sizeX);
         assert(t_w4i.range().size().y == _sizeY);
         auto _evaluateY1 = [&]
-                (Int _i, Int _j, auto type) __attribute__((always_inline)) {
+                (Int _i, Int _j, auto type)
+                __attribute__((always_inline,flatten))
+        {
         using T = decltype(type);
         // temporaries
         // variables
@@ -1267,7 +1427,9 @@ Int _sizeY = gny;
         assert(t_w4i_dy_m1_.range().size().y == _sizeY);
         assert(t_w4i_dy_m2_.range().size().x == _sizeX);
         assert(t_w4i_dy_m2_.range().size().y == _sizeY);
-        auto _evaluateY2 = [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {
+        auto _evaluateY2 = [&](Int _i, Int _j, auto type)
+            __attribute__((always_inline,flatten))
+        {
         using T = decltype(type);
         // temporaries
         T _c1;
@@ -1368,10 +1530,40 @@ Int _sizeY = gny;
 //        }
 //        }
 
+        struct Idx {
+            Int x{}, y{}, z{};
+        };
+        Int xx = (_sizeX / 4);
+        Int yy = (_sizeY / 2);
+        Int tt = (time_steps * 4);
+        std::vector<Idx> indices;
+        indices.reserve(xx * yy * tt);
 
-        tiledLoops(_sizeX / 4, _sizeY / 2, time_steps * 4,
-                   [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
-                   (int i, int j, int t) __attribute__((always_inline)) {
+        auto timeStart = std::chrono::system_clock::now();
+
+        // 33 seconds
+//        tiledLoops(xx, yy, tt, [&] (int i, int j, int t) {
+//            indices.push_back(Idx{i, j, t});
+//        });
+
+        // 31.5 seconds (half tile size: 24)
+        fixedTiledLoops(xx, yy, tt, 24, [&] (int i, int j, int t) {
+            indices.push_back(Idx{i, j, t});
+        });
+
+        auto timeEnd = std::chrono::system_clock::now();
+
+        std::chrono::duration<double> timeDiff = timeEnd - timeStart;
+
+        std::cerr << "Index gen time: " << timeDiff.count() << std::endl;
+
+        timeStart = std::chrono::system_clock::now();
+
+
+        for (const Idx& idx : indices) {
+            Int i = idx.x;
+            Int j = idx.y;
+            Int t = idx.z;
             switch(t % 4) {
             case 0:
                 _evaluateX1(4*i, 2*j, Real4());
@@ -1390,46 +1582,79 @@ Int _sizeY = gny;
                 _evaluateY2(4*i, 2*j+1, Real4());
                 break;
             }
-        });
+        }
 
-//        for (Int t = 0; t < time_steps; t++) {
-//            for (Int j = 0; j < _sizeY; j++) {
-//                Int i = 0;
-//                for (; i < _sizeX / 4 * 4; i+=4) {
-//                    _evaluateX1(i, j, Real4());
-//                }
-//                for (; i < _sizeX; i++) {
-//                    _evaluateX1(i, j, Real());
-//                }
+
+
+
+//        tiledLoops(_sizeX / 4, _sizeY / 2, time_steps * 4,
+//                   [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
+//                   (int i, int j, int t) __attribute__((always_inline)) {
+//            switch(t % 4) {
+//            case 0:
+//                _evaluateX1(4*i, 2*j, Real4());
+//                _evaluateX1(4*i, 2*j+1, Real4());
+//                break;
+//            case 1:
+//                _evaluateX2(4*i, 2*j, Real4());
+//                _evaluateX2(4*i, 2*j+1, Real4());
+//                break;
+//            case 2:
+//                _evaluateY1(4*i, 2*j, Real4());
+//                _evaluateY1(4*i, 2*j+1, Real4());
+//                break;
+//            case 3:
+//                _evaluateY2(4*i, 2*j, Real4());
+//                _evaluateY2(4*i, 2*j+1, Real4());
+//                break;
 //            }
+//        });
+
+        // 29 seconds
+//        for (Int t = 0; t < time_steps * 4; t++) {
 //            for (Int j = 0; j < _sizeY; j++) {
 //                Int i = 0;
 //                for (; i < _sizeX / 4 * 4; i+=4) {
-//                    _evaluateX2(i, j, Real4());
+//                    switch(t % 4) {
+//                    case 0:
+//                        _evaluateX1(i, j, Real4());
+//                        break;
+//                    case 1:
+//                        _evaluateX2(i, j, Real4());
+//                        break;
+//                    case 2:
+//                        _evaluateY1(i, j, Real4());
+//                        break;
+//                    case 3:
+//                        _evaluateY2(i, j, Real4());
+//                        break;
+//                    }
 //                }
 //                for (; i < _sizeX; i++) {
-//                    _evaluateX2(i, j, Real());
-//                }
-//            }
-//            for (Int j = 0; j < _sizeY; j++) {
-//                Int i = 0;
-//                for (; i < _sizeX / 4 * 4; i+=4) {
-//                    _evaluateY1(i, j, Real4());
-//                }
-//                for (; i < _sizeX; i++) {
-//                    _evaluateY1(i, j, Real());
-//                }
-//            }
-//            for (Int j = 0; j < _sizeY; j++) {
-//                Int i = 0;
-//                for (; i < _sizeX / 4 * 4; i+=4) {
-//                    _evaluateY2(i, j, Real4());
-//                }
-//                for (; i < _sizeX; i++) {
-//                    _evaluateY2(i, j, Real());
+//                    switch(t % 4) {
+//                    case 0:
+//                        _evaluateX1(i, j, Real());
+//                        break;
+//                    case 1:
+//                        _evaluateX2(i, j, Real());
+//                        break;
+//                    case 2:
+//                        _evaluateY1(i, j, Real());
+//                        break;
+//                    case 3:
+//                        _evaluateY2(i, j, Real());
+//                        break;
+//                    }
 //                }
 //            }
 //        }
+
+        timeEnd = std::chrono::system_clock::now();
+
+        timeDiff = timeEnd - timeStart;
+
+        std::cerr << "Looping time: " << timeDiff.count() << std::endl;
+
     }
 
     vxa.save(save_path + "/vx_" + withLeadingZeros(time_steps, 6) + ".bin");
