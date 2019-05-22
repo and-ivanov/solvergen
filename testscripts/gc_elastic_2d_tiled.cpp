@@ -1367,70 +1367,65 @@ Int _sizeY = gny;
 //        _evaluateY2(_i, _j, Real());
 //        }
 //        }
-        
-//        tiledLoops(_sizeX, _sizeY, time_steps, [](int i, int j, int t) {
-//            switch(t % 4) {
-//            case 0: _evaluateX1(i, j, Real4());
-//            case 1: _evaluateX2(i, j, Real4());
-//            }
-//        });
 
-        tiledLoops(_sizeX / 2, _sizeY / 2, time_steps * 4,
+
+        tiledLoops(_sizeX / 4, _sizeY / 2, time_steps * 4,
                    [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
                    (int i, int j, int t) __attribute__((always_inline)) {
             switch(t % 4) {
             case 0:
-                _evaluateX1(2*i, 2*j, Real());
-                _evaluateX1(2*i+1, 2*j, Real());
-                _evaluateX1(2*i, 2*j+1, Real());
-                _evaluateX1(2*i+1, 2*j+1, Real());
+                _evaluateX1(4*i, 2*j, Real4());
+                _evaluateX1(4*i, 2*j+1, Real4());
                 break;
             case 1:
-                _evaluateX2(2*i, 2*j, Real());
-                _evaluateX2(2*i+1, 2*j, Real());
-                _evaluateX2(2*i, 2*j+1, Real());
-                _evaluateX2(2*i+1, 2*j+1, Real());
-
+                _evaluateX2(4*i, 2*j, Real4());
+                _evaluateX2(4*i, 2*j+1, Real4());
                 break;
-
             case 2:
-                _evaluateY1(2*i, 2*j, Real());
-                _evaluateY1(2*i+1, 2*j, Real());
-                _evaluateY1(2*i, 2*j+1, Real());
-                _evaluateY1(2*i+1, 2*j+1, Real());
-
-
+                _evaluateY1(4*i, 2*j, Real4());
+                _evaluateY1(4*i, 2*j+1, Real4());
                 break;
-
             case 3:
-                _evaluateY2(2*i, 2*j, Real());
-                _evaluateY2(2*i+1, 2*j, Real());
-                _evaluateY2(2*i, 2*j+1, Real());
-                _evaluateY2(2*i+1, 2*j+1, Real());
-
+                _evaluateY2(4*i, 2*j, Real4());
+                _evaluateY2(4*i, 2*j+1, Real4());
                 break;
-
             }
         });
 
 //        for (Int t = 0; t < time_steps; t++) {
 //            for (Int j = 0; j < _sizeY; j++) {
-//                for (Int i = 0; i < _sizeX; i++) {
+//                Int i = 0;
+//                for (; i < _sizeX / 4 * 4; i+=4) {
+//                    _evaluateX1(i, j, Real4());
+//                }
+//                for (; i < _sizeX; i++) {
 //                    _evaluateX1(i, j, Real());
 //                }
 //            }
 //            for (Int j = 0; j < _sizeY; j++) {
-//                for (Int i = 0; i < _sizeX; i++) {
+//                Int i = 0;
+//                for (; i < _sizeX / 4 * 4; i+=4) {
+//                    _evaluateX2(i, j, Real4());
+//                }
+//                for (; i < _sizeX; i++) {
 //                    _evaluateX2(i, j, Real());
 //                }
 //            }
 //            for (Int j = 0; j < _sizeY; j++) {
-//                for (Int i = 0; i < _sizeX; i++) {
+//                Int i = 0;
+//                for (; i < _sizeX / 4 * 4; i+=4) {
+//                    _evaluateY1(i, j, Real4());
+//                }
+//                for (; i < _sizeX; i++) {
 //                    _evaluateY1(i, j, Real());
 //                }
 //            }
 //            for (Int j = 0; j < _sizeY; j++) {
-//                for (Int i = 0; i < _sizeX; i++) {
+//                Int i = 0;
+//                for (; i < _sizeX / 4 * 4; i+=4) {
+//                    _evaluateY2(i, j, Real4());
+//                }
+//                for (; i < _sizeX; i++) {
 //                    _evaluateY2(i, j, Real());
 //                }
 //            }
