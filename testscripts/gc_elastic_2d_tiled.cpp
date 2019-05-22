@@ -307,6 +307,14 @@ void tiledLoops(int nx, int ny, int nt, F func) {
 
 }
 
+template <typename F>
+void classicLoops(int nx, int ny, int nt, F func) {
+    for (int t = 0; t < nt; t++)
+        for (int j = 0; j < ny; j++)
+            for (int i = 0; i < nx; i++)
+                func(i, j, t);
+}
+
 void extend_ghost(Var a, Int gh, Int gnx, Int gny) {
     for (Int i = 0; i < gh; i++) {
         {
@@ -1552,10 +1560,10 @@ Int _sizeY = gny;
 //        });
 
         // 42 seconds
-        for (int t = 0; t < tt; t++)
-            for (int j = 0; j < yy; j++)
-                for (int i = 0; i < xx; i++)
-                    indices.push_back(Idx{i, j, t});
+//        for (int t = 0; t < tt; t++)
+//            for (int j = 0; j < yy; j++)
+//                for (int i = 0; i < xx; i++)
+//                    indices.push_back(Idx{i, j, t});
 
         auto timeEnd = std::chrono::system_clock::now();
 
@@ -1566,10 +1574,34 @@ Int _sizeY = gny;
         timeStart = std::chrono::system_clock::now();
 
 
-        for (const Idx& idx : indices) {
-            Int i = idx.x;
-            Int j = idx.y;
-            Int t = idx.z;
+//        for (const Idx& idx : indices) {
+//            Int i = idx.x;
+//            Int j = idx.y;
+//            Int t = idx.z;
+//            switch(t % 4) {
+//            case 0:
+//                _evaluateX1(4*i, 2*j, Real4());
+//                _evaluateX1(4*i, 2*j+1, Real4());
+//                break;
+//            case 1:
+//                _evaluateX2(4*i, 2*j, Real4());
+//                _evaluateX2(4*i, 2*j+1, Real4());
+//                break;
+//            case 2:
+//                _evaluateY1(4*i, 2*j, Real4());
+//                _evaluateY1(4*i, 2*j+1, Real4());
+//                break;
+//            case 3:
+//                _evaluateY2(4*i, 2*j, Real4());
+//                _evaluateY2(4*i, 2*j+1, Real4());
+//                break;
+//            }
+//        }
+
+        // 31.8 seconds
+        fixedTiledLoops(xx, yy, tt, 24,
+                   [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
+                   (int i, int j, int t) __attribute__((always_inline)) {
             switch(t % 4) {
             case 0:
                 _evaluateX1(4*i, 2*j, Real4());
@@ -1588,12 +1620,34 @@ Int _sizeY = gny;
                 _evaluateY2(4*i, 2*j+1, Real4());
                 break;
             }
-        }
+        });
 
+        // 28.6 seconds
+//        tiledLoops(xx, yy, tt,
+//                   [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
+//                   (int i, int j, int t) __attribute__((always_inline)) {
+//            switch(t % 4) {
+//            case 0:
+//                _evaluateX1(4*i, 2*j, Real4());
+//                _evaluateX1(4*i, 2*j+1, Real4());
+//                break;
+//            case 1:
+//                _evaluateX2(4*i, 2*j, Real4());
+//                _evaluateX2(4*i, 2*j+1, Real4());
+//                break;
+//            case 2:
+//                _evaluateY1(4*i, 2*j, Real4());
+//                _evaluateY1(4*i, 2*j+1, Real4());
+//                break;
+//            case 3:
+//                _evaluateY2(4*i, 2*j, Real4());
+//                _evaluateY2(4*i, 2*j+1, Real4());
+//                break;
+//            }
+//        });
 
-
-
-//        tiledLoops(_sizeX / 4, _sizeY / 2, time_steps * 4,
+        // 29.7 seconds
+//        classicLoops(xx, yy, tt,
 //                   [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
 //                   (int i, int j, int t) __attribute__((always_inline)) {
 //            switch(t % 4) {
