@@ -376,7 +376,7 @@ public:
 class LoopSequence {
 public:
     LoopSequence(int) {}
-    void operator()(int, int) {}
+    LoopSequence init(int, int) {return *this;}
 };
 
 

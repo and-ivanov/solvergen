@@ -116,6 +116,11 @@ public:
             }
             
             return RecursiveASTVisitor<SequenceVisitor>::TraverseStmt(ee->getArg(1));
+        } else if(e && isa<LambdaExpr>(e))
+        {
+            LambdaExpr* lambdaExpr = cast<LambdaExpr>(e);
+            lambdaStmt.insert(lambdaStmt.begin(), lambdaExpr->getBody());
+            return true;
         } else {
             return RecursiveASTVisitor<SequenceVisitor>::TraverseStmt(e);
         }
@@ -128,7 +133,7 @@ public:
         }
         return true;
     }
-    
+
     std::set<std::string> allVars() {
         std::set<std::string> res;
         res.insert(lhsVars.begin(), lhsVars.end());
@@ -140,6 +145,8 @@ public:
     std::set<std::string> lhsVars; // each use of Var
     std::set<std::string> temps; // each use of Temp
 
+    std::vector<CompoundStmt*> lambdaStmt;
+
 private:
     Rewriter& mRewriter;
 };
@@ -149,17 +156,36 @@ std::vector<const T*> findCurrentChildrens(const Stmt* parent) {
     std::vector<const T*> findedChildrens;
     auto parentChildrens =  parent->children();
 
-    for(const Stmt* parentChild : parentChildrens) {
-        if(dyn_cast<T>(parentChild) != nullptr) {
-            const T* findedChild = dyn_cast<const T>(parentChild);
-            findedChildrens.push_back(findedChild);
-        }
-        if(parentChild->children().begin() != parentChild->children().end()) {
-           std::vector<const T*> childChildrens = findCurrentChildrens<T>(parentChild);
-            findedChildrens.insert(findedChildrens.end(), childChildrens.begin(), childChildrens.end());
+    if(parentChildrens.begin() != parentChildrens.end()) {
+        for(const Stmt* parentChild : parentChildrens) {
+            if(isa<T>(parentChild)) {
+                const T* findedChild = dyn_cast<const T>(parentChild);
+                findedChildrens.push_back(findedChild);
+            }
+            if(parentChild->children().begin() != parentChild->children().end()) {
+                std::vector<const T*> childChildrens = findCurrentChildrens<T>(parentChild);
+                findedChildrens.insert(findedChildrens.end(), childChildrens.begin(), childChildrens.end());
+            }
         }
     }
     return findedChildrens;
+}
+
+template <typename T>
+T* findCurrentChild(Stmt* parent) {
+    auto parentChildrens =  parent->children();
+
+    if(parentChildrens.begin() != parentChildrens.end()) {
+        for(Stmt* parentChild : parentChildrens) {
+            if(isa<T>(parentChild)) {
+                return dyn_cast<T>(parentChild);
+            }
+            if(parentChild->children().begin() != parentChild->children().end()) {
+                return findCurrentChild<T>(parentChild);
+            }
+        }
+    }
+    return nullptr;
 }
 
 class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
@@ -172,8 +198,6 @@ public:
 
     bool VisitVarDecl(VarDecl *v) {
         if (v->getType().getAsString() == "struct Temp") {
-//            auto r = v->getTypeSourceInfo()->getTypeLoc().getSourceRange();
-//            mRewriter.ReplaceText(r, "Real");
             mRewriter.RemoveText(v->getSourceRange());
         }
         return true;
@@ -186,12 +210,6 @@ public:
             mRewriter.ReplaceText(r, "_sizeX, _sizeY");
         }
         return true;
-    }
-
-    bool VisitVarDecl(VarDecl *v) {
-        if (v->hasLocalStorage()) {
-
-        }
     }
 
     bool VisitFunctionDecl(FunctionDecl *f) {
@@ -223,123 +241,211 @@ public:
         return true;
     }
 
+    bool StmtProcessing(Stmt* s, ForStmt* forstmt = nullptr, int stmtIndex = -1) {
+        Expr* expr = cast<Expr>(s);
+        assert(expr);
+
+        // find begin and end
+        SourceLocation begin = expr->getBeginLoc();
+        SourceLocation end = expr->getEndLoc();
+
+        // find length of last token
+        unsigned endOffset = Lexer::MeasureTokenLength(
+                    end, mRewriter.getSourceMgr(), mRewriter.getLangOpts());
+        endOffset++; // skip ';' after last token
+        end = end.getLocWithOffset(endOffset);
+
+        // process expression
+        SequenceVisitor sv(mRewriter);
+        sv.TraverseStmt(expr);
+
+        if (sv.allVars().empty()) {
+            // sometimes it can be empty (in headers)
+            // but if it is empty in our code we should stop on error
+            mRewriter.InsertText(begin, "!!! ``` !!!", true, true);
+            return true;
+        }
+
+        mRewriter.InsertText(begin, "{\n", true, true);
+
+        // put all rhs Vars into temporaries
+        for (auto& e : sv.allVars()) {
+            std::string ss = (Twine("Var ") + temporaryName(e) + " = " + e + ";\n").str();
+            mRewriter.InsertText(begin, ss, true, true);
+        }
+
+        // find iteration space size
+        auto sizeXStr = (Twine("Int _sizeX = ") + temporaryName(*sv.allVars().begin()) + ".range().size().x;\n").str();
+        mRewriter.InsertText(begin, sizeXStr, true, true);
+
+        auto sizeYStr = (Twine("Int _sizeY = ") + temporaryName(*sv.allVars().begin()) + ".range().size().y;\n").str();
+        mRewriter.InsertText(begin, sizeYStr, true, true);
+
+        // add assertions
+        for (auto& e : sv.allVars()) {
+            std::string ssX = (Twine("assert(") +  temporaryName(e)  + ".range().size().x == _sizeX);\n").str();
+            mRewriter.InsertText(begin, ssX, true, true);
+            std::string ssY = (Twine("assert(") +  temporaryName(e)  + ".range().size().y == _sizeY);\n").str();
+            mRewriter.InsertText(begin, ssY, true, true);
+        }
+
+        if(forstmt == nullptr) {
+         // add expression lambda
+        mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {\n", true, true);
+        } else {
+          std::string lambdaVar;
+          switch (stmtIndex) {
+          case 0:
+              lambdaVar = "X1";
+              break;
+          case 1:
+              lambdaVar = "X2";
+              break;
+          case 2:
+              lambdaVar = "Y1";
+              break;
+          case 3:
+              lambdaVar = "Y2";
+              break;
+          default:
+              break;
+          }
+          std::string lamdbaDecl = (Twine("auto _evaluate")+ lambdaVar +"= [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {\n").str();
+          mRewriter.InsertText(begin, lamdbaDecl, true, true);
+        }
+        mRewriter.InsertText(begin, "using T = decltype(type);\n", true, true);
+
+        // create temporaries for each loop iteration
+        mRewriter.InsertText(begin, "// temporaries\n", true, true);
+        for (auto& e : sv.temps) {
+            std::string ss = (Twine("T ") + escapedName(e) + ";\n").str();
+            mRewriter.InsertText(begin, ss, true, true);
+        }
+
+        mRewriter.InsertText(begin, "// variables\n", true, true);
+        for (auto& e : sv.allVars()) {
+            std::string ss = (Twine("T ") + escapedName(e) + ";\n").str();
+            mRewriter.InsertText(begin, ss, true, true);
+        }
+
+        // load values from both lhs and rhs
+        // we load lhs, because it is difficult to detect is it read only or read write
+        mRewriter.InsertText(begin, "// loads\n", true, true);
+        for (auto& e : sv.allVars()) {
+            std::string ss = (Twine("loadFromPtr(") + escapedName(e) + ", " +
+                              "&" + temporaryName(e) + ".val(_i, _j));\n").str();
+            mRewriter.InsertText(begin, ss, true, true);
+        }
+
+        // here the main expressions will be inserted
+        // add end of line after it
+        mRewriter.InsertText(end, "\n", true, true);
+
+        // store values to lhs
+        for (auto& e : sv.lhsVars) {
+            std::string ss = (Twine("storeToPtr(") +
+                              "&" + temporaryName(e) + ".val(_i, _j)," +
+                              escapedName(e) + ");\n").str();
+            mRewriter.InsertText(end, ss, true, true);
+        }
+
+        // add closing brace of lambda
+        mRewriter.InsertText(end, "};\n", true, true);
+
+        if(forstmt == nullptr) {
+            if (LoopsVectorization.getValue()) {
+                mRewriter.InsertText(end, vecLoops, true, true);
+            } else {
+                mRewriter.InsertText(end, loops, true, true);
+            }
+        }
+        mRewriter.InsertText(end, "}\n", true, true);
+
+        return true;
+
+    }
+
+    std::vector<Expr*> findExprInLoop (ForStmt* f, std::string name) {
+        std::vector<Expr*> findedExpr;
+        for(auto loopChild : f->getBody()->children()) {
+            if(isa<ForStmt>(loopChild)) {
+                std::vector<Expr*> expr = findExprInLoop(dyn_cast<ForStmt>(loopChild), name);
+                findedExpr.insert(findedExpr.end(), expr.begin(), expr.end());
+            }
+            if(isa<Expr>(loopChild) && cast<Expr>(loopChild)->getType().getAsString() == name) {
+                findedExpr.push_back(dyn_cast<Expr>(loopChild));
+            }
+        }
+        return findedExpr;
+    }
+
     bool TraverseStmt(Stmt* e) {
         if (e && isa<Expr>(e) &&
                 (cast<Expr>(e)->getType().getAsString() == "struct Sequence" ||
                  cast<Expr>(e)->getType().getAsString() == "struct Assign"))
         {
-            Expr* expr = cast<Expr>(e);
+            return StmtProcessing(e);
+
+        }  else if (e && isa<CXXOperatorCallExpr>(e) && cast<CXXOperatorCallExpr>(e)->getType().getAsString() == "class DefineLoop") {
+            CXXOperatorCallExpr* expr = cast<CXXOperatorCallExpr>(e);
             assert(expr);
 
-            // find begin and end
-            SourceLocation begin = expr->getBeginLoc();
-            SourceLocation end = expr->getEndLoc();
+            SequenceVisitor sm(mRewriter);
+            sm.TraverseStmt(expr);
 
-            // find length of last token
-            unsigned endOffset = Lexer::MeasureTokenLength(
-                        end, mRewriter.getSourceMgr(), mRewriter.getLangOpts());
-            endOffset++; // skip ';' after last token
-            end = end.getLocWithOffset(endOffset);
+            SourceLocation begin = Lexer::GetBeginningOfToken(expr->getBeginLoc(), mRewriter.getSourceMgr(), mRewriter.getLangOpts());
+            SourceLocation end = Lexer::GetBeginningOfToken(expr->getExprLoc(), mRewriter.getSourceMgr(), mRewriter.getLangOpts());
 
-            // process expression
-
-            SequenceVisitor sv(mRewriter);
-            sv.TraverseStmt(expr);
-
-            if (sv.allVars().empty()) {
-                // sometimes it can be empty (in headers)
-                // but if it is empty in our code we should stop on error
-                mRewriter.InsertText(begin, "!!! ``` !!!", true, true);
-                return true;
-            }
-
-            mRewriter.InsertText(begin, "{\n", true, true);
-
-            // put all rhs Vars into temporaries
-            for (auto& e : sv.allVars()) {
-                std::string ss = (Twine("Var ") + temporaryName(e) + " = " + e + ";\n").str();
-                mRewriter.InsertText(begin, ss, true, true);
-            }
-
-
-            // find iteration space size
-            auto sizeXStr = (Twine("Int _sizeX = ") + temporaryName(*sv.allVars().begin()) + ".range().size().x;\n").str();
-            mRewriter.InsertText(begin, sizeXStr, true, true);
-
-            auto sizeYStr = (Twine("Int _sizeY = ") + temporaryName(*sv.allVars().begin()) + ".range().size().y;\n").str();
-            mRewriter.InsertText(begin, sizeYStr, true, true);
-
-            // add assertions
-            for (auto& e : sv.allVars()) {
-                std::string ssX = (Twine("assert(") +  temporaryName(e)  + ".range().size().x == _sizeX);\n").str();
-                mRewriter.InsertText(begin, ssX, true, true);
-                std::string ssY = (Twine("assert(") +  temporaryName(e)  + ".range().size().y == _sizeY);\n").str();
-                mRewriter.InsertText(begin, ssY, true, true);
-            }
-
-            // add expression lambda
-
-            mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {\n", true, true);
-            mRewriter.InsertText(begin, "using T = decltype(type);\n", true, true);
-
-            // create temporaries for each loop iteration
-            mRewriter.InsertText(begin, "// temporaries\n", true, true);
-            for (auto& e : sv.temps) {
-                std::string ss = (Twine("T ") + escapedName(e) + ";\n").str();
-                mRewriter.InsertText(begin, ss, true, true);
-            }
-            
-            mRewriter.InsertText(begin, "// variables\n", true, true);
-            for (auto& e : sv.allVars()) {
-                std::string ss = (Twine("T ") + escapedName(e) + ";\n").str();
-                mRewriter.InsertText(begin, ss, true, true);
-            }
-
-            // load values from both lhs and rhs
-            // we load lhs, because it is difficult to detect is it read only or read write
-            mRewriter.InsertText(begin, "// loads\n", true, true);
-            for (auto& e : sv.allVars()) {
-                std::string ss = (Twine("loadFromPtr(") + escapedName(e) + ", " +
-                                  "&" + temporaryName(e) + ".val(_i, _j));\n").str();
-                mRewriter.InsertText(begin, ss, true, true);
-            }
-
-            // here the main expressions will be inserted
-            // add end of line after it
-            mRewriter.InsertText(end, "\n", true, true);
-            
-            // store values to lhs
-            for (auto& e : sv.lhsVars) {
-                std::string ss = (Twine("storeToPtr(") + 
-                    "&" + temporaryName(e) + ".val(_i, _j)," +
-                    escapedName(e) + ");\n").str();
-                mRewriter.InsertText(end, ss, true, true);
-            }
-            
-            // add closing brace of lambda
-            mRewriter.InsertText(end, "};\n", true, true);
-
-//            const Expr& currentNodeStmt = *expr;
-//            ASTContext::DynTypedNodeList parentList = mContext->getParents(currentNodeStmt);
-//            int count = 0;
-//            for(auto nodeParent : parentList) {
-//                nodeParent.get<ForStmt>();
-//                count++;
-//            }
-           std::cout << "Node " << expr->getStmtClassName() << std::endl;
-
-            //if(expr->getStmtClassName() ) {
-                // insert loops with call to lambda
-                if (LoopsVectorization.getValue()) {
-                    mRewriter.InsertText(end, vecLoops, true, true);
-                } else {
-                    mRewriter.InsertText(end, loops, true, true);
+            ForStmt* loop;
+            std::vector<Stmt*> statements;
+            for(CompoundStmt* stmt : sm.lambdaStmt) {
+                for(Stmt* child : stmt->children()) {
+                    if(isa<ForStmt>(child)) {
+                        loop = *dyn_cast<ForStmt>(child);
+                    }
+                    if(isa<Expr>(child) &&(cast<Expr>(child)->getType().getAsString() == "struct Sequence" ||
+                                           cast<Expr>(child)->getType().getAsString() == "struct Assign"))  {
+                        statements.insert(statements.begin(), child);
+                    }
                 }
-            //}
+            }
 
-            mRewriter.InsertText(end, "}\n", true, true);
+            for(Expr* seq : findExprInLoop(loop, "class LoopSequence")) {
+                CXXConstructExpr* construct = findCurrentChild<CXXConstructExpr>(seq);
+                int value =  std::atoi(getText(construct->getArg(0), mRewriter).c_str());
+
+                CXXMemberCallExpr* call = findCurrentChild<CXXMemberCallExpr>(seq);
+                std::string i = getText(call->getArg(0), mRewriter);
+                std::string j = getText(call->getArg(1), mRewriter);
+
+                std::string lambdaVar;
+                switch (value) {
+                case 0:
+                    lambdaVar = "X1";
+                    break;
+                case 1:
+                    lambdaVar = "X2";
+                    break;
+                case 2:
+                    lambdaVar = "Y1";
+                    break;
+                case 3:
+                    lambdaVar = "Y2";
+                    break;
+                default:
+                    break;
+                }
+                std::string lamdbaDecl = (Twine("_evaluate")+ lambdaVar + "(" + i + ", " + j + "," + "Real())").str();
+                mRewriter.ReplaceText(seq->getSourceRange(), lamdbaDecl);
+            }
+
+            int stmtNum = 0;
+            for (auto stmt : statements) {
+                StmtProcessing(stmt, loop, stmtNum);
+                stmtNum++;
+            }
+
             return true;
-
         } else if(e && isa<DeclStmt>(e))
         {
             DeclStmt* declStmt = dyn_cast<DeclStmt>(e);
@@ -400,9 +506,9 @@ public:
         : mVisitor(rewriter, context)
     {
         //mMatcher.addMatcher(..., &mForLoopHandler);
-        mMatcher.addMatcher(
-                    expr(hasName("struct DefineLoop")
-                         ));
+//        mMatcher.addMatcher(
+//                    expr(hasName("struct DefineLoop")
+//                         ));
 //        Matcher.addMatcher(
 //              forStmt(hasLoopInit(declStmt(hasSingleDecl(
 //                         varDecl(hasInitializer(integerLiteral(equals(0))))
