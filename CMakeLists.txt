@@ -124,6 +124,8 @@ add_executable(gc_elastic_2d_tiled
     ../solvergen/testscripts/gc_elastic_2d_tiled.cpp
 )
 target_link_libraries(gc_elastic_2d_tiled hrdata solver_lib)
+target_compile_options(gc_elastic_2d_tiled PRIVATE -march=native) # enables vector instructions
+
 
 
 
