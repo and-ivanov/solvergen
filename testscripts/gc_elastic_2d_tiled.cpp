@@ -1547,9 +1547,15 @@ Int _sizeY = gny;
 //        });
 
         // 31.5 seconds (half tile size: 24)
-        fixedTiledLoops(xx, yy, tt, 24, [&] (int i, int j, int t) {
-            indices.push_back(Idx{i, j, t});
-        });
+//        fixedTiledLoops(xx, yy, tt, 24, [&] (int i, int j, int t) {
+//            indices.push_back(Idx{i, j, t});
+//        });
+
+        // 42 seconds
+        for (int t = 0; t < tt; t++)
+            for (int j = 0; j < yy; j++)
+                for (int i = 0; i < xx; i++)
+                    indices.push_back(Idx{i, j, t});
 
         auto timeEnd = std::chrono::system_clock::now();
 
