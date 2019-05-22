@@ -16,6 +16,7 @@
 #endif
 
 #include "vectorclass.h"
+#include "immintrin.h"
 
 using Int = int64_t;
 using Real = double;
@@ -134,7 +135,7 @@ struct Array {
         return *this;
     }
 
-    Real& val(Int x, Int y) {
+    Real& val(Int x, Int y) __attribute__((always_inline,flatten)) {
         assert(0 <= x && x < mSize.x);
         assert(0 <= y && y < mSize.y);
         return mData[size_t(x + mSize.x * y)];
@@ -185,7 +186,8 @@ struct Var {
     Assign operator*=(const Expr&) { return Assign(); }
     Assign operator/=(const Expr&) { return Assign(); }
 
-    Real& val(Int x, Int y) {
+    __attribute__((always_inline,flatten))
+    inline Real& val(Int x, Int y) __attribute__((always_inline,flatten)) {
         assert(0 <= x && x < mRange.size().x);
         assert(0 <= y && y < mRange.size().y);
         return mArray.val(mRange.xs + x, mRange.ys + y);

@@ -12,6 +12,7 @@ if(NOT vectorclass_POPULATED)
 endif()
 
 add_library(solver_lib solverhelper.cpp solverhelper.h)
+
 target_include_directories(
     solver_lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}> # hardcoded for build
