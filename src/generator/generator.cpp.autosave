@@ -498,8 +498,6 @@ public:
                 mRewriter.InsertTextAfter(expr->getEndLoc(), Twine(str + "\n").str());
             }
 
-
-
             return true;
         } else if(e && isa<DeclStmt>(e))
         {

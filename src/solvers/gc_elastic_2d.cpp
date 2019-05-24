@@ -178,6 +178,11 @@ int main(int argc, char** argv) {
             w2i = - vxi * icpi + sxxi * ilmi,
             w3i = + vyi * icsi + sxyi * imui,
             w4i = - vyi * icsi + sxyi * imui;
+
+            w1i = + vxi * icpi + sxxi * ilmi,
+            w2i = - vxi * icpi + sxxi * ilmi,
+            w3i = + vyi * icsi + sxyi * imui,
+            w4i = - vyi * icsi + sxyi * imui;
         } + //start 3 (first operator)
         [&]() { //apply DefinedLoop with only save 2
             c1 = cpi * dt / dx,
