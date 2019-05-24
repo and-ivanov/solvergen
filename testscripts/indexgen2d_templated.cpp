@@ -311,6 +311,16 @@ template <typename F> struct LargeTile<0, F> {
     }
 };
 
+template <typename F> 
+void tiledLoopsTemplated(int nx, int ny, int nt, F f) {
+    constexpr int tileSize = 15;
+    int nodesWidth = std::max(nx, std::max(ny, nt));
+    int requiredTileSize = 0;
+    while ((1 << requiredTileSize) < nodesWidth) requiredTileSize++;
+    assert(requiredTileSize <= tileSize);
+    LargeTile<tileSize, decltype(f)>::run(0, 0, -(1 << tileSize), nx, ny, nt, f);
+}
+
 int main() {
     int nx = 2000;
     int ny = 2000;
@@ -334,8 +344,7 @@ int main() {
         //assert(checker.check(i, j, t));
         unused += i + j + t;
     };
-    constexpr int tileSize = 17;
-    LargeTile<tileSize, decltype(f)>::run(0, 0, -1 << tileSize, nx, ny, nt, f);
+    tiledLoopsTemplated(nx, ny, nt, f);
 
     cerr << "unused: " << unused << endl;
 }
