@@ -215,6 +215,12 @@ struct LargeTile {
 template <int Level, typename F>
 void SmallTileX<Level, F>::run(int i, int j, int t, int nx, int ny, int nt, F func) {
     constexpr int tileSize = 1 << (Level - 1);
+    constexpr int tileWidth = tileSize * 2 - 1;
+    constexpr int tileHeight = tileSize * 2 - 1;
+
+    if (i + tileWidth < 0 || i - tileWidth >= nx ||
+        j + tileWidth < 0 || j - tileWidth >= ny ||
+        t + tileHeight < 0 || t >= nt) return;
 
     SmallTileX<Level - 1, F>::run(i - tileSize, j, t, nx, ny, nt, func);
     SmallTileX<Level - 1, F>::run(i + tileSize, j, t, nx, ny, nt, func);
@@ -228,6 +234,12 @@ void SmallTileX<Level, F>::run(int i, int j, int t, int nx, int ny, int nt, F fu
 template <int Level, typename F>
 void SmallTileY<Level, F>::run(int i, int j, int t, int nx, int ny, int nt, F func) {
     constexpr int tileSize = 1 << (Level - 1);
+    constexpr int tileWidth = tileSize * 2 - 1;
+    constexpr int tileHeight = tileSize * 2 - 1;
+
+    if (i + tileWidth < 0 || i - tileWidth >= nx ||
+        j + tileWidth < 0 || j - tileWidth >= ny ||
+        t + tileHeight < 0 || t >= nt) return;
 
     SmallTileY<Level - 1, F>::run(i, j - tileSize, t, nx, ny, nt, func);
     SmallTileY<Level - 1, F>::run(i, j + tileSize, t, nx, ny, nt, func);
@@ -241,6 +253,12 @@ void SmallTileY<Level, F>::run(int i, int j, int t, int nx, int ny, int nt, F fu
 template <int Level, typename F>
 void LargeTile<Level, F>::run(int i, int j, int t, int nx, int ny, int nt, F func) {
     constexpr int tileSize = 1 << (Level - 1);
+    constexpr int tileWidth = tileSize * 2 - 1;
+    constexpr int tileHeight = tileSize * 4 - 1;
+
+    if (i + tileWidth < 0 || i - tileWidth >= nx ||
+        j + tileWidth < 0 || j - tileWidth >= ny ||
+        t + tileHeight < 0 || t >= nt) return;
 
     LargeTile<Level - 1, F>::run(i, j, t, nx, ny, nt, func);
 
@@ -264,29 +282,43 @@ void LargeTile<Level, F>::run(int i, int j, int t, int nx, int ny, int nt, F fun
 
 template <typename F> struct SmallTileX<0, F> {
     static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
-        func(i, j, t);
+        if (0 <= i && i < nx &&
+            0 <= j && j < ny &&
+            0 <= t && t < nt) 
+        {
+            func(i, j, t);
+        }
     }
 };
 template <typename F> struct SmallTileY<0, F> {
     static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
-        func(i, j, t);
+        if (0 <= i && i < nx &&
+            0 <= j && j < ny &&
+            0 <= t && t < nt) 
+        {
+            func(i, j, t);
+        }
     }
 };
 template <typename F> struct LargeTile<0, F> {
     static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
-        func(i, j, t);
-        func(i, j, t + 1);
+        if (0 <= i && i < nx &&
+            0 <= j && j < ny) 
+        {
+            if (0 <= t && t < nt) func(i, j, t);
+            if (0 <= t + 1 && t + 1 < nt) func(i, j, t + 1);
+        }
     }
 };
 
 int main() {
-    int nx = 30;
-    int ny = 30;
-    int nt = 30;
+    int nx = 2000;
+    int ny = 2000;
+    int nt = 100;
     
     Checker checker(nx, ny);
 
-    volatile int unused = 0;
+    int unused = 0;
 
     //auto f = [&unused,&checker](int i, int j, int t) {
     //    std::cout << i << " " << j << " " << t << endl;
@@ -296,11 +328,14 @@ int main() {
     //};
     //tiledLoops(nx, ny, nt, f);
     //templatedTiledLoops();
-    auto f = [](int i, int j, int t) {
-        std::cerr << i << " " << j << " " << t << endl;
-        std::cout << i << " " << j << " " << t << endl;
+    auto f = [&](int i, int j, int t) {
+        //std::cerr << i << " " << j << " " << t << endl;
+        //std::cout << i << " " << j << " " << t << endl;
+        //assert(checker.check(i, j, t));
+        unused += i + j + t;
     };
-    LargeTile<2, decltype(f)>::run(0, 0, 0, 10, 10, 10, f);
+    constexpr int tileSize = 17;
+    LargeTile<tileSize, decltype(f)>::run(0, 0, -1 << tileSize, nx, ny, nt, f);
 
     cerr << "unused: " << unused << endl;
 }
