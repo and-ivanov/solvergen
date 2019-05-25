@@ -3,60 +3,208 @@
 
 #include <chrono>
 
+template <int Level, typename F, typename Enable = void> struct SmallTileX;
+template <int Level, typename F, typename Enable = void> struct SmallTileY;
+template <int Level, typename F, typename Enable = void> struct LargeTile;
 
-template <typename F>
-void largeTile(int ox, int oy, int ot,
-        int nx, int ny, int nt, int smallTileHeight, F func)
-{
-    int largeTileHeight = smallTileHeight * 2;
-    for (int t = max(0, ot); t < min(nt, ot + largeTileHeight); t++) {
-        int at = t - ot;
-        int halfWidth = std::min(at, largeTileHeight - at - 1);
-        for (int j = max(0, oy - halfWidth); j <= min(ny - 1, oy + halfWidth); j++) {
-            for (int i = max(0, ox - halfWidth); i <= min(nx - 1, ox + halfWidth); i++) {
-                func(i, j, t);
-            }
+template <int Level, typename F>
+struct SmallTileX<Level, F, typename std::enable_if<(Level >= 3)>::type> {
+    __attribute__((noinline))
+    inline static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        constexpr int tileSize = 1 << (Level - 1);
+        constexpr int tileWidth = tileSize * 2 - 1;
+        constexpr int tileHeight = tileSize * 2 - 1;
+
+        if (i + tileWidth < 0 || i - tileWidth >= nx ||
+            j + tileWidth < 0 || j - tileWidth >= ny ||
+            t + tileHeight < 0 || t >= nt) return;
+
+        SmallTileX<Level - 1, F>::run(i - tileSize, j, t, nx, ny, nt, func);
+        SmallTileX<Level - 1, F>::run(i + tileSize, j, t, nx, ny, nt, func);
+
+        LargeTile<Level - 1, F>::run(i, j, t, nx, ny, nt, func);
+
+        SmallTileX<Level - 1, F>::run(i, j - tileSize, t + tileSize, nx, ny, nt, func);
+        SmallTileX<Level - 1, F>::run(i, j + tileSize, t + tileSize, nx, ny, nt, func);
+    }
+};
+
+template <int Level, typename F>
+struct SmallTileY<Level, F, typename std::enable_if<(Level >= 3)>::type> {
+    __attribute__((noinline))
+    inline static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        constexpr int tileSize = 1 << (Level - 1);
+        constexpr int tileWidth = tileSize * 2 - 1;
+        constexpr int tileHeight = tileSize * 2 - 1;
+
+        if (i + tileWidth < 0 || i - tileWidth >= nx ||
+            j + tileWidth < 0 || j - tileWidth >= ny ||
+            t + tileHeight < 0 || t >= nt) return;
+
+        SmallTileY<Level - 1, F>::run(i, j - tileSize, t, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i, j + tileSize, t, nx, ny, nt, func);
+
+        LargeTile<Level - 1, F>::run(i, j, t, nx, ny, nt, func);
+
+        SmallTileY<Level - 1, F>::run(i - tileSize, j, t + tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i + tileSize, j, t + tileSize, nx, ny, nt, func);
+    }
+};
+
+template <int Level, typename F>
+struct LargeTile<Level, F, typename std::enable_if<(Level >= 3)>::type> {
+    __attribute__((noinline))
+    static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        constexpr int tileSize = 1 << (Level - 1);
+        constexpr int tileWidth = tileSize * 2 - 1;
+        constexpr int tileHeight = tileSize * 4 - 1;
+
+        if (i + tileWidth < 0 || i - tileWidth >= nx ||
+            j + tileWidth < 0 || j - tileWidth >= ny ||
+            t + tileHeight < 0 || t >= nt) return;
+
+        LargeTile<Level - 1, F>::run(i, j, t, nx, ny, nt, func);
+
+        SmallTileX<Level - 1, F>::run(i, j - tileSize, t + tileSize, nx, ny, nt, func);
+        SmallTileX<Level - 1, F>::run(i, j + tileSize, t + tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i - tileSize, j, t + tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i + tileSize, j, t + tileSize, nx, ny, nt, func);
+
+        LargeTile<Level - 1, F>::run(i - tileSize, j - tileSize, t + tileSize, nx, ny, nt, func);
+        LargeTile<Level - 1, F>::run(i + tileSize, j - tileSize, t + tileSize, nx, ny, nt, func);
+        LargeTile<Level - 1, F>::run(i - tileSize, j + tileSize, t + tileSize, nx, ny, nt, func);
+        LargeTile<Level - 1, F>::run(i + tileSize, j + tileSize, t + tileSize, nx, ny, nt, func);
+
+        SmallTileX<Level - 1, F>::run(i - tileSize, j, t + 2 * tileSize, nx, ny, nt, func);
+        SmallTileX<Level - 1, F>::run(i + tileSize, j, t + 2 * tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i, j - tileSize, t + 2 * tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i, j + tileSize, t + 2 * tileSize, nx, ny, nt, func);
+
+        LargeTile<Level - 1, F>::run(i, j, t + 2 * tileSize, nx, ny, nt, func);
+    }
+};
+
+
+template <int Level, typename F>
+struct SmallTileX<Level, F, typename std::enable_if<(1 <= Level && Level <= 2)>::type> {
+    __attribute__((always_inline))
+    inline static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        constexpr int tileSize = 1 << (Level - 1);
+        constexpr int tileWidth = tileSize * 2 - 1;
+        constexpr int tileHeight = tileSize * 2 - 1;
+
+        if (i + tileWidth < 0 || i - tileWidth >= nx ||
+            j + tileWidth < 0 || j - tileWidth >= ny ||
+            t + tileHeight < 0 || t >= nt) return;
+
+        SmallTileX<Level - 1, F>::run(i - tileSize, j, t, nx, ny, nt, func);
+        SmallTileX<Level - 1, F>::run(i + tileSize, j, t, nx, ny, nt, func);
+
+        LargeTile<Level - 1, F>::run(i, j, t, nx, ny, nt, func);
+
+        SmallTileX<Level - 1, F>::run(i, j - tileSize, t + tileSize, nx, ny, nt, func);
+        SmallTileX<Level - 1, F>::run(i, j + tileSize, t + tileSize, nx, ny, nt, func);
+    }
+};
+
+template <int Level, typename F>
+struct SmallTileY<Level, F, typename std::enable_if<(1 <= Level && Level <= 2)>::type> {
+    __attribute__((always_inline))
+    inline static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        constexpr int tileSize = 1 << (Level - 1);
+        constexpr int tileWidth = tileSize * 2 - 1;
+        constexpr int tileHeight = tileSize * 2 - 1;
+
+        if (i + tileWidth < 0 || i - tileWidth >= nx ||
+            j + tileWidth < 0 || j - tileWidth >= ny ||
+            t + tileHeight < 0 || t >= nt) return;
+
+        SmallTileY<Level - 1, F>::run(i, j - tileSize, t, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i, j + tileSize, t, nx, ny, nt, func);
+
+        LargeTile<Level - 1, F>::run(i, j, t, nx, ny, nt, func);
+
+        SmallTileY<Level - 1, F>::run(i - tileSize, j, t + tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i + tileSize, j, t + tileSize, nx, ny, nt, func);
+    }
+};
+
+template <int Level, typename F>
+struct LargeTile<Level, F, typename std::enable_if<(1 <= Level && Level <= 2)>::type> {
+    __attribute__((always_inline))
+    inline static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        constexpr int tileSize = 1 << (Level - 1);
+        constexpr int tileWidth = tileSize * 2 - 1;
+        constexpr int tileHeight = tileSize * 4 - 1;
+
+        if (i + tileWidth < 0 || i - tileWidth >= nx ||
+            j + tileWidth < 0 || j - tileWidth >= ny ||
+            t + tileHeight < 0 || t >= nt) return;
+
+        LargeTile<Level - 1, F>::run(i, j, t, nx, ny, nt, func);
+
+        SmallTileX<Level - 1, F>::run(i, j - tileSize, t + tileSize, nx, ny, nt, func);
+        SmallTileX<Level - 1, F>::run(i, j + tileSize, t + tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i - tileSize, j, t + tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i + tileSize, j, t + tileSize, nx, ny, nt, func);
+
+        LargeTile<Level - 1, F>::run(i - tileSize, j - tileSize, t + tileSize, nx, ny, nt, func);
+        LargeTile<Level - 1, F>::run(i + tileSize, j - tileSize, t + tileSize, nx, ny, nt, func);
+        LargeTile<Level - 1, F>::run(i - tileSize, j + tileSize, t + tileSize, nx, ny, nt, func);
+        LargeTile<Level - 1, F>::run(i + tileSize, j + tileSize, t + tileSize, nx, ny, nt, func);
+
+        SmallTileX<Level - 1, F>::run(i - tileSize, j, t + 2 * tileSize, nx, ny, nt, func);
+        SmallTileX<Level - 1, F>::run(i + tileSize, j, t + 2 * tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i, j - tileSize, t + 2 * tileSize, nx, ny, nt, func);
+        SmallTileY<Level - 1, F>::run(i, j + tileSize, t + 2 * tileSize, nx, ny, nt, func);
+
+        LargeTile<Level - 1, F>::run(i, j, t + 2 * tileSize, nx, ny, nt, func);
+    }
+};
+
+
+template <typename F> struct SmallTileX<0, F> {
+    __attribute__((always_inline))
+    inline static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        if (0 <= i && i < nx &&
+            0 <= j && j < ny &&
+            0 <= t && t < nt)
+        {
+            func(i, j, t);
         }
     }
-}
-
-template <typename F>
-void smallTileX(int ox, int oy, int ot,
-        int nx, int ny, int nt, int smallTileHeight, F func)
-{
-    int largeTileHeight = smallTileHeight * 2;
-    //cerr << "small tile x" << endl;
-    for (int t = max(0, ot); t < min(nt, ot + smallTileHeight); t++) {
-        //cerr << "t: " << t << endl;
-        int at = t - ot;
-        //cerr << "at: " << at << endl;
-        int halfWidthX = smallTileHeight - at - 1;
-        int halfWidthY = at;
-        //cerr << "halfWidthX: " << halfWidthX << endl;
-        //cerr << "halfWidthY: " << halfWidthY << endl;
-        for (int j = max(0, oy - halfWidthY); j <= min(ny - 1, oy + halfWidthY); j++) {
-            for (int i = max(0, ox - halfWidthX); i <= min(nx - 1, ox + halfWidthX); i++) {
-                func(i, j, t);
-            }
+};
+template <typename F> struct SmallTileY<0, F> {
+    __attribute__((always_inline))
+    inline static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        if (0 <= i && i < nx &&
+            0 <= j && j < ny &&
+            0 <= t && t < nt)
+        {
+            func(i, j, t);
         }
     }
-}
-
-template <typename F>
-void smallTileY(int ox, int oy, int ot,
-        int nx, int ny, int nt, int smallTileHeight, F func)
-{
-    int largeTileHeight = smallTileHeight * 2;
-    for (int t = max(0, ot); t < min(nt, ot + smallTileHeight); t++) {
-        int at = t - ot;
-        int halfWidthX = at;
-        int halfWidthY = smallTileHeight - at - 1;
-        for (int j = max(0, oy - halfWidthY); j <= min(ny - 1, oy + halfWidthY); j++) {
-            for (int i = max(0, ox - halfWidthX); i <= min(nx - 1, ox + halfWidthX); i++) {
-                func(i, j, t);
-            }
+};
+template <typename F> struct LargeTile<0, F> {
+    __attribute__((always_inline))
+    inline static void run(int i, int j, int t, int nx, int ny, int nt, F func) {
+        if (0 <= i && i < nx &&
+            0 <= j && j < ny)
+        {
+            if (0 <= t && t < nt) func(i, j, t);
+            if (0 <= t + 1 && t + 1 < nt) func(i, j, t + 1);
         }
     }
+};
+
+template <typename F>
+void tiledLoopsTemplated(int nx, int ny, int nt, F f) {
+    constexpr int tileSize = 15;
+    int nodesWidth = std::max(nx, std::max(ny, nt));
+    int requiredTileSize = 0;
+    while ((1 << requiredTileSize) < nodesWidth) requiredTileSize++;
+    assert(requiredTileSize <= tileSize);
+    LargeTile<tileSize, decltype(f)>::run(0, 0, -(1 << tileSize), nx, ny, nt, f);
 }
 
 template <typename F>
@@ -1544,8 +1692,8 @@ Int _sizeY = gny;
         Int xx = (_sizeX / 4);
         Int yy = (_sizeY / 2);
         Int tt = (time_steps * 4);
-        std::vector<Idx> indices;
-        indices.reserve(xx * yy * tt);
+//        std::vector<Idx> indices;
+//        indices.reserve(xx * yy * tt);
 
         auto timeStart = std::chrono::system_clock::now();
 
@@ -1599,28 +1747,28 @@ Int _sizeY = gny;
 //        }
 
         // 31.8 seconds
-        fixedTiledLoops(xx, yy, tt, 24,
-                   [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
-                   (int i, int j, int t) __attribute__((always_inline)) {
-            switch(t % 4) {
-            case 0:
-                _evaluateX1(4*i, 2*j, Real4());
-                _evaluateX1(4*i, 2*j+1, Real4());
-                break;
-            case 1:
-                _evaluateX2(4*i, 2*j, Real4());
-                _evaluateX2(4*i, 2*j+1, Real4());
-                break;
-            case 2:
-                _evaluateY1(4*i, 2*j, Real4());
-                _evaluateY1(4*i, 2*j+1, Real4());
-                break;
-            case 3:
-                _evaluateY2(4*i, 2*j, Real4());
-                _evaluateY2(4*i, 2*j+1, Real4());
-                break;
-            }
-        });
+//        fixedTiledLoops(xx, yy, tt, 24,
+//                   [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
+//                   (int i, int j, int t) __attribute__((always_inline)) {
+//            switch(t % 4) {
+//            case 0:
+//                _evaluateX1(4*i, 2*j, Real4());
+//                _evaluateX1(4*i, 2*j+1, Real4());
+//                break;
+//            case 1:
+//                _evaluateX2(4*i, 2*j, Real4());
+//                _evaluateX2(4*i, 2*j+1, Real4());
+//                break;
+//            case 2:
+//                _evaluateY1(4*i, 2*j, Real4());
+//                _evaluateY1(4*i, 2*j+1, Real4());
+//                break;
+//            case 3:
+//                _evaluateY2(4*i, 2*j, Real4());
+//                _evaluateY2(4*i, 2*j+1, Real4());
+//                break;
+//            }
+//        });
 
         // 28.6 seconds
 //        tiledLoops(xx, yy, tt,
@@ -1669,6 +1817,32 @@ Int _sizeY = gny;
 //                break;
 //            }
 //        });
+
+        tiledLoopsTemplated(xx, yy, tt,
+                            [&_evaluateX1,&_evaluateX2,&_evaluateY1,&_evaluateY2]
+                            (int i, int j, int t)
+                            __attribute__((always_inline))
+                            //__attribute__((noinline))
+        {
+            switch(t % 4) {
+            case 0:
+                _evaluateX1(4*i, 2*j, Real4());
+                _evaluateX1(4*i, 2*j+1, Real4());
+                break;
+            case 1:
+                _evaluateX2(4*i, 2*j, Real4());
+                _evaluateX2(4*i, 2*j+1, Real4());
+                break;
+            case 2:
+                _evaluateY1(4*i, 2*j, Real4());
+                _evaluateY1(4*i, 2*j+1, Real4());
+                break;
+            case 3:
+                _evaluateY2(4*i, 2*j, Real4());
+                _evaluateY2(4*i, 2*j+1, Real4());
+                break;
+            }
+        });
 
         // 29 seconds
 //        for (Int t = 0; t < time_steps * 4; t++) {
