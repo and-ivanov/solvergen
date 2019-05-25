@@ -9,32 +9,46 @@
 using namespace std;
 
 
-std::array<int, 1000*1000> checker{};
-
-bool check(int i, int j, int t) {
-    int& val = checker.at((500 + i) + 1000 * (500 + j));
-    array<int, 3> is = {-1, 0, 1};
-    array<int, 3> js = {-1, 0, 1};
-    if (val == 0) {
-        val = t;
-        return true;
-    } else {
+class Checker {
+public:
+    Checker(int nx, int ny)
+        : nx(nx), ny(ny), data(nx * ny, -1)
+    {
+    }
+    bool check(int i, int j, int t) {
+        int& val = data.at(i + nx * j);
+        auto is = {-1, 0, 1};
+        auto js = {-1, 0, 1};
         for (int iss : is) {
             for (int jss : js) {
-                int vval = checker.at((500 + i + iss) + 1000 * (500 + j + jss));
-                if (vval != 0) {
-                    if (vval < t - 1) return false;
+                int ii = i + iss;
+                int jj = j + jss;
+                if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
+                int vval = data.at(ii + nx * jj);
+                if (vval < t - 1) {
+                    cerr << "vval: " << vval << endl;
+                    cerr << "nx: " << nx << endl;
+                    cerr << "ny: " << ny << endl;
+                    cerr << "ii: " << ii << endl;
+                    cerr << "jj: " << jj << endl;
+                    cerr << "i: " << i << endl;
+                    cerr << "j: " << j << endl;
+                    cerr << "t: " << t << endl;
+                    return false;
                 }
             }
         }
-        if (val == 0 || val == t - 1) {
+        if (val == t - 1) {
             val = t;
             return true;
         } else {
             return false;
         }
     }
-}
+private:    
+    int nx, ny;
+    std::vector<int> data;
+};
 
 
 template <typename T>
@@ -194,16 +208,18 @@ void tiledLoops(int nx, int ny, int nt, F func) {
 }
 
 int main() {
-    int nx = 1000;
-    int ny = 1000;
-    int nt = 100;
+    int nx = 30;
+    int ny = 30;
+    int nt = 30;
     
+    Checker checker(nx, ny);
+
     volatile int unused = 0;
 
-    auto f = [&unused](int i, int j, int t) {
-        //std::cout << i << " " << j << " " << t << endl;
+    auto f = [&unused,&checker](int i, int j, int t) {
+        std::cout << i << " " << j << " " << t << endl;
         //cerr << "ijt: " << i << " " << j << " " << t << endl;
-        //assert(check(i, j, t));
+        assert(checker.check(i, j, t));
         unused += i + j + t;
     };
     tiledLoops(nx, ny, nt, f);
