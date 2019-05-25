@@ -128,6 +128,18 @@ public:
         } else if(e && isa<LambdaExpr>(e))
         {
             LambdaExpr* lambdaExpr = cast<LambdaExpr>(e);
+
+            SourceLocation beginLambda = lambdaExpr->getBeginLoc();
+            SourceLocation beginLambdaBody = Lexer::GetBeginningOfToken(lambdaExpr->getBody()->getLBracLoc(),
+                                                                        mRewriter.getSourceMgr(), LangOptions());
+
+            SourceLocation endLambda = lambdaExpr->getEndLoc();
+            SourceLocation endLambdaBody = Lexer::GetBeginningOfToken(lambdaExpr->getBody()->getRBracLoc(),
+                                                                      mRewriter.getSourceMgr(), LangOptions());
+
+//            mRewriter.RemoveText(SourceRange(beginLambda, beginLambdaBody));
+//            mRewriter.RemoveText(SourceRange(endLambda, endLambdaBody));
+
             lambdaStmt.push_back(lambdaExpr->getBody());
             return true;
         } else {
@@ -256,7 +268,7 @@ public:
         return true;
     }
 
-    bool StmtProcessing(Stmt* s, Stmt* loopStmt = nullptr, int stmtIndex = -1) {
+    bool StmtProcessing(Stmt* s, Stmt* loopStmt = nullptr, int stmtIndex = 0) {
         Expr* expr = cast<Expr>(s);
         assert(expr);
 
@@ -281,32 +293,37 @@ public:
             return true;
         }
 
-        mRewriter.InsertText(begin, "{\n", true, true);
+        if(loopStmt == nullptr)
+            mRewriter.InsertText(begin, "{\n", true, true);
 
         // put all rhs Vars into temporaries
         for (auto& e : sv.allVars()) {
-            std::string ss = (Twine("Var ") + temporaryName(e) + " = " + e + ";\n").str();
+            std::string ss = (Twine("Var ") + temporaryName(e) + "_" + std::to_string(stmtIndex) + " = " + e + ";\n").str();
             mRewriter.InsertText(begin, ss, true, true);
         }
 
         // find iteration space size
-        auto sizeXStr = (Twine("Int _sizeX = ") + temporaryName(*sv.allVars().begin()) + ".range().size().x;\n").str();
+        auto sizeXStr = (Twine("Int _sizeX_") + std::to_string(stmtIndex) + " = " + temporaryName(*sv.allVars().begin())
+                         + "_" + std::to_string(stmtIndex) + ".range().size().x;\n").str();
         mRewriter.InsertText(begin, sizeXStr, true, true);
 
-        auto sizeYStr = (Twine("Int _sizeY = ") + temporaryName(*sv.allVars().begin()) + ".range().size().y;\n").str();
+        auto sizeYStr = (Twine("Int _sizeY_") + std::to_string(stmtIndex) + " = " + temporaryName(*sv.allVars().begin())
+                         + "_" + std::to_string(stmtIndex) + ".range().size().y;\n").str();
         mRewriter.InsertText(begin, sizeYStr, true, true);
 
         // add assertions
         for (auto& e : sv.allVars()) {
-            std::string ssX = (Twine("assert(") +  temporaryName(e)  + ".range().size().x == _sizeX);\n").str();
+            std::string ssX = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().x == _sizeX_"
+                               + std::to_string(stmtIndex) + ");\n").str();
             mRewriter.InsertText(begin, ssX, true, true);
-            std::string ssY = (Twine("assert(") +  temporaryName(e)  + ".range().size().y == _sizeY);\n").str();
+            std::string ssY = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().y == _sizeY_"
+                               + std::to_string(stmtIndex) + ");\n").str();
             mRewriter.InsertText(begin, ssY, true, true);
         }
 
         if(loopStmt == nullptr) {
          // add expression lambda
-        mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {\n", true, true);
+        mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) __attribute__((always_inline,flatten)) {\n", true, true);
         } else {
           std::string lambdaVar;
           switch (stmtIndex) {
@@ -348,7 +365,7 @@ public:
         mRewriter.InsertText(begin, "// loads\n", true, true);
         for (auto& e : sv.allVars()) {
             std::string ss = (Twine("loadFromPtr(") + escapedName(e) + ", " +
-                              "&" + temporaryName(e) + ".val(_i, _j));\n").str();
+                              "&" + temporaryName(e) + "_" + std::to_string(stmtIndex) + ".val(_i, _j));\n").str();
             mRewriter.InsertText(begin, ss, true, true);
         }
 
@@ -359,7 +376,7 @@ public:
         // store values to lhs
         for (auto& e : sv.lhsVars) {
             std::string ss = (Twine("storeToPtr(") +
-                              "&" + temporaryName(e) + ".val(_i, _j)," +
+                              "&" + temporaryName(e) + "_" + std::to_string(stmtIndex) + ".val(_i, _j)," +
                               escapedName(e) + ");\n").str();
             mRewriter.InsertText(end, ss, true, true);
         }
@@ -374,10 +391,11 @@ public:
                 mRewriter.InsertText(end, loops, true, true);
             }
         }
-        mRewriter.InsertText(end, "}\n", true, true);
+
+        if(loopStmt == nullptr)
+            mRewriter.InsertText(end, "}\n", true, true);
 
         return true;
-
     }
 
     std::vector<Expr*> findExprInLoop (ForStmt* f, std::string name) {
@@ -473,20 +491,30 @@ public:
             sm.TraverseStmt(expr);
 
             SourceLocation begin = Lexer::GetBeginningOfToken(expr->getBeginLoc(), mRewriter.getSourceMgr(), mRewriter.getLangOpts());
-            SourceLocation end = Lexer::GetBeginningOfToken(expr->getExprLoc(), mRewriter.getSourceMgr(), mRewriter.getLangOpts());
 
             //first is defineloop; Need to check in
             CompoundStmt* defineLoopStmt = sm.lambdaStmt.at(0);
+
+            //remove DefineLoop
+            SourceLocation prevStmtEndLoc = defineLoopStmt->getRBracLoc();
+            mRewriter.RemoveText(SourceRange(begin, prevStmtEndLoc));
 
             std::vector<Stmt*> statements;
             for(CompoundStmt* stmt : sm.lambdaStmt) {
                 for(Stmt* child : stmt->children()) {
                     if(isa<Expr>(child) &&(cast<Expr>(child)->getType().getAsString() == "struct Sequence" ||
                                            cast<Expr>(child)->getType().getAsString() == "struct Assign"))  {
-                        statements.insert(statements.begin(), child);
+                        statements.push_back(child);
+
+                        //remove brackets and operator+ between lambdas
+                        SourceLocation currentStmtBeginLoc = stmt->getLBracLoc();
+                        mRewriter.RemoveText(SourceRange(prevStmtEndLoc, currentStmtBeginLoc));
+                        prevStmtEndLoc = stmt->getRBracLoc();
                     }
                 }
             }
+
+           mRewriter.InsertText(begin, "{\n", true, true);
 
             int stmtNum = 0;
             for (auto stmt : statements) {
@@ -495,10 +523,8 @@ public:
             }
 
             for(auto str : loopProcessing(defineLoopStmt)) {
-                mRewriter.InsertTextAfter(expr->getEndLoc(), Twine(str + "\n").str());
+                mRewriter.InsertText(expr->getEndLoc(), Twine(str + " \n").str(), true, true);
             }
-
-
 
             return true;
         } else if(e && isa<DeclStmt>(e))
