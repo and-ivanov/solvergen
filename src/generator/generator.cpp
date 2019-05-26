@@ -136,10 +136,6 @@ public:
             SourceLocation endLambda = lambdaExpr->getEndLoc();
             SourceLocation endLambdaBody = Lexer::GetBeginningOfToken(lambdaExpr->getBody()->getRBracLoc(),
                                                                       mRewriter.getSourceMgr(), LangOptions());
-
-//            mRewriter.RemoveText(SourceRange(beginLambda, beginLambdaBody));
-//            mRewriter.RemoveText(SourceRange(endLambda, endLambdaBody));
-
             lambdaStmt.push_back(lambdaExpr->getBody());
             return true;
         } else {
@@ -231,7 +227,6 @@ public:
     }
 
     bool VisitDeclRefExpr(DeclRefExpr* e) {
-        //need change! Error in: for(Int _j = 0; _j < size.y; _j+=4)
         if(e->getType().getAsString() == "struct Size") {
             auto r = e->getSourceRange();
             mRewriter.ReplaceText(r, "_sizeX, _sizeY");
@@ -268,7 +263,7 @@ public:
         return true;
     }
 
-    bool StmtProcessing(Stmt* s, Stmt* loopStmt = nullptr, int stmtIndex = 0) {
+    bool StmtProcessing(Stmt* s, Stmt* loopStmt = nullptr, int stmtIndex = -1) {
         Expr* expr = cast<Expr>(s);
         assert(expr);
 
@@ -298,26 +293,42 @@ public:
 
         // put all rhs Vars into temporaries
         for (auto& e : sv.allVars()) {
-            std::string ss = (Twine("Var ") + temporaryName(e) + "_" + std::to_string(stmtIndex) + " = " + e + ";\n").str();
+            std::string ss;
+            if(stmtIndex >= 0) {
+                ss = (Twine("Var ") + temporaryName(e) + "_" + std::to_string(stmtIndex) + " = " + e + ";\n").str();
+            } else ss = (Twine("Var ") + temporaryName(e) + " = " + e + ";\n").str();
             mRewriter.InsertText(begin, ss, true, true);
         }
 
         // find iteration space size
-        auto sizeXStr = (Twine("Int _sizeX_") + std::to_string(stmtIndex) + " = " + temporaryName(*sv.allVars().begin())
-                         + "_" + std::to_string(stmtIndex) + ".range().size().x;\n").str();
+        std::string sizeXStr;
+        if(stmtIndex >= 0) {
+            sizeXStr = (Twine("Int _sizeX_") + std::to_string(stmtIndex) + " = " + temporaryName(*sv.allVars().begin())
+                             + "_" + std::to_string(stmtIndex) + ".range().size().x;\n").str();
+        } else sizeXStr = (Twine("Int _sizeX") + " = " + temporaryName(*sv.allVars().begin())
+                            + ".range().size().x;\n").str();
         mRewriter.InsertText(begin, sizeXStr, true, true);
 
-        auto sizeYStr = (Twine("Int _sizeY_") + std::to_string(stmtIndex) + " = " + temporaryName(*sv.allVars().begin())
-                         + "_" + std::to_string(stmtIndex) + ".range().size().y;\n").str();
+        std::string sizeYStr;
+        if(stmtIndex >= 0) {
+            sizeYStr = (Twine("Int _sizeY_") + std::to_string(stmtIndex) + " = " + temporaryName(*sv.allVars().begin())
+                             + "_" + std::to_string(stmtIndex) + ".range().size().y;\n").str();
+        } else sizeYStr = (Twine("Int _sizeY") + " = " + temporaryName(*sv.allVars().begin())
+                            + ".range().size().y;\n").str();
         mRewriter.InsertText(begin, sizeYStr, true, true);
 
         // add assertions
         for (auto& e : sv.allVars()) {
-            std::string ssX = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().x == _sizeX_"
+            std::string ssX;
+            std::string ssY;
+            if(stmtIndex >= 0) {
+                    ssX = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().x == _sizeX_"
                                + std::to_string(stmtIndex) + ");\n").str();
+                    ssY = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().y == _sizeY_"
+                                                   + std::to_string(stmtIndex) + ");\n").str();
+            } else {ssX = (Twine("assert(") +  temporaryName(e) + ".range().size().x == _sizeX);\n").str();
+                    ssY = (Twine("assert(") +  temporaryName(e) + ".range().size().y == _sizeY);\n").str();}
             mRewriter.InsertText(begin, ssX, true, true);
-            std::string ssY = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().y == _sizeY_"
-                               + std::to_string(stmtIndex) + ");\n").str();
             mRewriter.InsertText(begin, ssY, true, true);
         }
 
@@ -364,8 +375,12 @@ public:
         // we load lhs, because it is difficult to detect is it read only or read write
         mRewriter.InsertText(begin, "// loads\n", true, true);
         for (auto& e : sv.allVars()) {
-            std::string ss = (Twine("loadFromPtr(") + escapedName(e) + ", " +
-                              "&" + temporaryName(e) + "_" + std::to_string(stmtIndex) + ".val(_i, _j));\n").str();
+            std::string ss;
+            if(stmtIndex >= 0) {
+                ss = (Twine("loadFromPtr(") + escapedName(e) + ", " +
+                      "&" + temporaryName(e) + "_" + std::to_string(stmtIndex) + ".val(_i, _j));\n").str();
+            } else ss = (Twine("loadFromPtr(") + escapedName(e) + ", " +
+                         "&" + temporaryName(e) + ".val(_i, _j));\n").str();
             mRewriter.InsertText(begin, ss, true, true);
         }
 
@@ -375,9 +390,14 @@ public:
 
         // store values to lhs
         for (auto& e : sv.lhsVars) {
-            std::string ss = (Twine("storeToPtr(") +
-                              "&" + temporaryName(e) + "_" + std::to_string(stmtIndex) + ".val(_i, _j)," +
-                              escapedName(e) + ");\n").str();
+            std::string ss;
+            if(stmtIndex >= 0) {
+                ss = (Twine("storeToPtr(") +
+                      "&" + temporaryName(e) + "_" + std::to_string(stmtIndex) + ".val(_i, _j)," +
+                      escapedName(e) + ");\n").str();
+            } else ss = (Twine("storeToPtr(") +
+                         "&" + temporaryName(e) + ".val(_i, _j)," +
+                         escapedName(e) + ");\n").str();
             mRewriter.InsertText(end, ss, true, true);
         }
 
