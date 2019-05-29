@@ -175,18 +175,18 @@ private:
 };
 
 template <typename T>
-std::vector<const T*> findCurrentChildrens(const Stmt* parent) {
-    std::vector<const T*> findedChildrens;
+std::vector<T*> findCurrentChildrens(Stmt* parent) {
+    std::vector<T*> findedChildrens;
     auto parentChildrens =  parent->children();
 
     if(parentChildrens.begin() != parentChildrens.end()) {
-        for(const Stmt* parentChild : parentChildrens) {
+        for(Stmt* parentChild : parentChildrens) {
             if(isa<T>(parentChild)) {
-                const T* findedChild = dyn_cast<const T>(parentChild);
+                T* findedChild = cast<T>(parentChild);
                 findedChildrens.push_back(findedChild);
             }
             if(parentChild->children().begin() != parentChild->children().end()) {
-                std::vector<const T*> childChildrens = findCurrentChildrens<T>(parentChild);
+                std::vector<T*> childChildrens = findCurrentChildrens<T>(parentChild);
                 findedChildrens.insert(findedChildrens.end(), childChildrens.begin(), childChildrens.end());
             }
         }
@@ -196,19 +196,21 @@ std::vector<const T*> findCurrentChildrens(const Stmt* parent) {
 
 template <typename T>
 T* findCurrentChild(Stmt* parent) {
+    T* findedChild = nullptr;
     auto parentChildrens =  parent->children();
 
     if(parentChildrens.begin() != parentChildrens.end()) {
         for(Stmt* parentChild : parentChildrens) {
-            if(isa<T>(parentChild)) {
+            if(parentChild && isa<T>(parentChild)) {
                 return dyn_cast<T>(parentChild);
             }
             if(parentChild->children().begin() != parentChild->children().end()) {
-                return findCurrentChild<T>(parentChild);
+                findedChild = findCurrentChild<T>(parentChild);
+                if(findedChild != nullptr) return findedChild;
             }
         }
     }
-    return nullptr;
+    return findedChild;
 }
 
 class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
@@ -405,15 +407,12 @@ public:
         return true;
     }
 
-    std::vector<Expr*> findExprInLoop (ForStmt* f, std::string name) {
+    std::vector<Expr*> findCurrentExprInStmt (Stmt* f, std::string name) {
         std::vector<Expr*> findedExpr;
-        for(auto loopChild : f->getBody()->children()) {
-            if(isa<ForStmt>(loopChild)) {
-                std::vector<Expr*> expr = findExprInLoop(dyn_cast<ForStmt>(loopChild), name);
-                findedExpr.insert(findedExpr.end(), expr.begin(), expr.end());
-            }
-            if(isa<Expr>(loopChild) && cast<Expr>(loopChild)->getType().getAsString() == name) {
-                findedExpr.push_back(dyn_cast<Expr>(loopChild));
+
+        for(auto child : findCurrentChildrens<Expr>(f)) {
+            if(child && child->getType().getAsString() == name) {
+                findedExpr.push_back(cast<Expr>(child));
             }
         }
         return findedExpr;
@@ -423,51 +422,41 @@ public:
     std::vector<std::string> loopProcessing(CompoundStmt* loop) {
         std::vector<std::string> sourceBuffer;
 
-        for(Stmt* loopBodyIt : loop->body()) {
-            SourceLocation loopBegin = loopBodyIt->getBeginLoc();
-            for(auto child : loopBodyIt->children()) {
-                if(child && isa<CompoundStmt>(child)) {
-                    CompoundStmt* statement = cast<CompoundStmt>(child);
-                    SourceLocation lBracketLoc = statement->getLBracLoc();
+        SourceLocation stmtStart = loop->getBeginLoc();
+        SourceLocation stmtEnd = loop->getEndLoc();
 
-                    std::string s = Lexer::getSourceText(
-                                CharSourceRange::getTokenRange(SourceRange(loopBegin, lBracketLoc)),
-                                mRewriter.getSourceMgr(),
-                                LangOptions());
-                    sourceBuffer.push_back(s);
+        std::vector<Expr*> loopSeqVec = findCurrentExprInStmt(loop, "class LoopSequence");
 
-                    std::vector<std::string> innerSourceBuffer = loopProcessing(statement);
-                    sourceBuffer.insert(sourceBuffer.end(), innerSourceBuffer.begin(), innerSourceBuffer.end());
+        for(auto l : loopSeqVec) {
+            CallExpr* callInitLoop = cast<CallExpr>(l);
+            SourceLocation loopInitStart =Lexer::GetBeginningOfToken(callInitLoop->getBeginLoc().getLocWithOffset(-1), mRewriter.getSourceMgr(), LangOptions());
+            std::string s = Lexer::getSourceText(
+                        CharSourceRange::getTokenRange(SourceRange(stmtStart, loopInitStart)),
+                        mRewriter.getSourceMgr(),
+                        LangOptions());
 
-                    SourceLocation loopEnd =loopBodyIt->getEndLoc();
-                    SourceLocation rBracketLoc = Lexer::getLocForEndOfToken(loopEnd, 1, mRewriter.getSourceMgr(),LangOptions());
-                    s = Lexer::getSourceText(
-                                CharSourceRange::getTokenRange(SourceRange(loopEnd, rBracketLoc)),
-                                mRewriter.getSourceMgr(),
-                                LangOptions());
-                    sourceBuffer.push_back(s);
-                }
-                if(child && isa<Expr>(child) && cast<Expr>(child)->getType().getAsString() == "class LoopSequence") {
-                    CXXConstructExpr* construct = findCurrentChild<CXXConstructExpr>(child);
-                    std::string loopNum =  getText(construct->getArg(0), mRewriter);
+                sourceBuffer.push_back(s);
 
-                    CXXMemberCallExpr* call = cast<CXXMemberCallExpr>(child);
-                    if(call == nullptr) call = findCurrentChild<CXXMemberCallExpr>(child);
-                    std::string i = getText(call->getArg(0), mRewriter);
-                    std::string j = getText(call->getArg(1), mRewriter);
+            std::string loopNum =  getText(callInitLoop->getArg(0), mRewriter);
+            std::string vectorizationNum = getText(callInitLoop->getArg(1), mRewriter);
+            std::string i = getText(callInitLoop->getArg(2), mRewriter);
+            std::string j = getText(callInitLoop->getArg(3), mRewriter);
 
-                    std::string lambdaDecl;
-                    if(LoopsVectorization.getValue()) {
-                        lambdaDecl = (Twine("_evaluate_")+ loopNum + "(" + i + ", " + j + ", " + "Real4());").str();
-                    } else {
-                        lambdaDecl = (Twine("_evaluate_")+ loopNum + "(" + i + ", " + j + ", " + "Real());").str();
-                    }
-
-                    sourceBuffer.push_back(lambdaDecl);
-                }
+            std::string lambdaDecl;
+            if(std::stoi(vectorizationNum) == 1) {
+                lambdaDecl = (Twine("_evaluate_")+ loopNum + "(" + i + ", " + j + ", " + "Real())").str();
+            } else {
+                lambdaDecl = (Twine("_evaluate_")+ loopNum + "(" + i + ", " + j + ", " + "Real" + vectorizationNum + "())").str();
             }
+            sourceBuffer.push_back(lambdaDecl);
+
+            stmtStart = Lexer::GetBeginningOfToken(callInitLoop->getEndLoc().getLocWithOffset(1), mRewriter.getSourceMgr(), LangOptions());
         }
 
+        sourceBuffer.push_back(Lexer::getSourceText(
+                                   CharSourceRange::getTokenRange(SourceRange(stmtStart, stmtEnd)),
+                                   mRewriter.getSourceMgr(),
+                                   LangOptions()));
         return sourceBuffer;
     }
 
@@ -521,16 +510,11 @@ public:
             mRewriter.InsertText(expr->getEndLoc(), Twine(sm.lambdaFunctions.at(0) + " __attribute__((always_inline)) { \n").str(), true, true);
 
             for(auto str : loopProcessing(defineLoopStmt)) {
-                mRewriter.InsertText(expr->getEndLoc(), Twine(str + " \n").str(), true, true);
+                mRewriter.InsertText(expr->getEndLoc(), Twine(str).str(), true, true);
             }
             mRewriter.InsertText(expr->getEndLoc(), Twine("};\n").str(), true, true);
 
-            if(LoopsVectorization.getValue()) {
-                mRewriter.InsertText(expr->getEndLoc(), Twine("CHECK(_sizeX%4 == 0); \n").str(), true, true);
-                mRewriter.InsertText(expr->getEndLoc(), Twine("loop(_sizeX/4, _sizeY);\n").str(), true, true);
-            } else {
-                mRewriter.InsertText(expr->getEndLoc(), Twine("loop(_sizeX, _sizeY);\n").str(), true, true);
-            }
+            mRewriter.InsertText(expr->getEndLoc(), Twine("loop(_sizeX, _sizeY);\n").str(), true, true);
 
             return true;
         } else if(e && isa<DeclStmt>(e))
@@ -545,8 +529,8 @@ public:
                     auto r = e->getSourceRange();
                     VarDecl* v = dyn_cast<VarDecl>(decl);
 
-                    const Expr* e = v->getInit();//v->getAnyInitializer();
-                    std::vector<const DeclRefExpr*> refExpr = findCurrentChildrens<DeclRefExpr>(cast<Stmt>(e));
+                    Expr* e = v->getInit();//v->getAnyInitializer();
+                    std::vector<DeclRefExpr*> refExpr = findCurrentChildrens<DeclRefExpr>(cast<Stmt>(e));
 
                     std::vector<std::string> rValueNames;
                     for (auto ref : refExpr) {

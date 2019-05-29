@@ -1,6 +1,355 @@
 #include "solverhelper.h"
 #include "hrdata/hrdata.h"
 
+//***************Tiling methods************************//
+enum TileKind : int8_t {
+    TileLarge = 0, TileSmallX = 1, TileSmallY = 2
+};
+
+namespace TilesNamespace {
+
+    constexpr const int8_t largeTileSize = 14;
+    constexpr const int8_t smallTileSize = 5;
+    constexpr const int8_t largeTileStart = 0;
+    constexpr const int8_t smallTileXStart = largeTileStart + largeTileSize;
+    constexpr const int8_t smallTileYStart = smallTileXStart + smallTileSize;
+    constexpr const int8_t lutSize = smallTileYStart + smallTileSize;
+
+    constexpr const std::array<int8_t, lutSize> lutI{0, 0, 0,-1, 1,-1, 1,-1, 1,-1, 1, 0, 0, 0,/**/-1, 1, 0, 0, 0,/**/ 0, 0, 0,-1, 1};
+    constexpr const std::array<int8_t, lutSize> lutJ{0,-1, 1, 0, 0,-1,-1, 1, 1, 0, 0,-1, 1, 0,/**/ 0, 0, 0,-1, 1,/**/-1, 1, 0, 0, 0};
+    constexpr const std::array<int8_t, lutSize> lutT{0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,/**/ 0, 0, 0, 1, 1,/**/ 0, 0, 0, 1, 1};
+    constexpr const std::array<int8_t, lutSize> lutK{0, 1, 1, 2, 2, 0, 0, 0, 0, 1, 1, 2, 2, 0,/**/ 1, 1, 0, 1, 1,/**/ 2, 2, 0, 2, 2};
+};
+
+template <int Level, typename F>
+struct Tile {
+    __attribute__((always_inline))
+    inline static void run(TileKind tk, int i, int j, int t, int nx, int ny, int nt, F func) {
+        using namespace TilesNamespace;
+
+        constexpr int tileSize = 1 << (Level - 1);
+        constexpr int tileWidth = tileSize * 2 - 1;
+        int tileHeight = (tk == TileLarge) ? (tileSize * 4 - 1) : (tileSize * 2 - 1);
+
+        if (i + tileWidth < 0 || i - tileWidth >= nx ||
+            j + tileWidth < 0 || j - tileWidth >= ny ||
+            t + tileHeight < 0 || t >= nt) return;
+
+        int8_t llstart = 0;
+        int8_t llend = 0;
+
+        switch (tk) {
+            case TileLarge:
+                llstart = largeTileStart;
+                llend = llstart + largeTileSize;
+                break;
+            case TileSmallX:
+                llstart = smallTileXStart;
+                llend = llstart + smallTileSize;
+                break;
+            case TileSmallY:
+                llstart = smallTileYStart;
+                llend = llstart + smallTileSize;
+                break;
+        }
+
+        for (int ll = llstart; ll < llend; ll++) {
+            Tile<Level - 1, F>::run(
+                    TileKind(lutK[ll]),
+                    i + tileSize * lutI[ll],
+                    j + tileSize * lutJ[ll],
+                    t + tileSize * lutT[ll],
+                    nx, ny, nt, func);
+        }
+    }
+};
+
+template <typename F> struct Tile<0, F> {
+    __attribute__((always_inline))
+    inline static void run(TileKind tk, int i, int j, int t, int nx, int ny, int nt, F func) {
+        if (0 <= i && i < nx && 0 <= j && j < ny)
+        {
+            if (0 <= t && t < nt)
+                func(i, j, t);
+            if (tk == TileLarge)
+                if (0 <= t + 1 && t + 1 < nt)
+                    func(i, j, t + 1);
+        }
+    }
+};
+
+template <typename F>
+void tiledLoopsTemplated(int nx, int ny, int nt, F f) {
+    constexpr int tileSize = 15;
+    int nodesWidth = std::max(nx, std::max(ny, nt));
+    int requiredTileSize = 0;
+    while ((1 << requiredTileSize) < nodesWidth) requiredTileSize++;
+    assert(requiredTileSize <= tileSize);
+    Tile<tileSize, decltype(f)>::run(TileLarge, 0, 0, -(1 << tileSize), nx, ny, nt, f);
+}
+
+template <typename F>
+void fixedTiledLoops(int nx, int ny, int nt, int smallTileHeight, F func) {
+    int largeTileHeight = smallTileHeight * 2;
+    int ntt = (nt - 1) / largeTileHeight + 1;
+    int nxx = (nx - 1) / largeTileHeight + 1;
+    int nyy = (ny - 1) / largeTileHeight + 1;
+
+    // because tiles will not cover the last layers
+    ntt++;
+    nxx++;
+    nyy++;
+
+    for (int tt = 0; tt < ntt; tt++) {
+        int ot = tt * largeTileHeight;
+
+        //cerr << "L1" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                largeTile(
+                        ox + smallTileHeight,
+                        oy + smallTileHeight,
+                        ot - smallTileHeight,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "X1" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                smallTileX(
+                        ox + smallTileHeight,
+                        oy,
+                        ot,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "Y1" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                smallTileY(
+                        ox,
+                        oy + smallTileHeight,
+                        ot,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "L2" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                largeTile(
+                        ox,
+                        oy,
+                        ot,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "X2" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                smallTileX(
+                        ox,
+                        oy + smallTileHeight,
+                        ot + smallTileHeight,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+        //cerr << "X2" << endl;
+        for (int yy = 0; yy < nyy; yy++) {
+            int oy = yy * largeTileHeight;
+            for (int xx = 0; xx < nxx; xx++) {
+                int ox = xx * largeTileHeight;
+                smallTileY(
+                        ox + smallTileHeight,
+                        oy,
+                        ot + smallTileHeight,
+                        nx, ny, nt, smallTileHeight, func);
+            }
+        }
+    }
+
+
+}
+
+template <typename T>
+inline T pow2(T k) {
+    return 1ll << k;
+}
+
+template <typename F>
+void tiledLoops(int nx, int ny, int nt, F func) {
+    std::array<int8_t,24> lut_ii{
+        0, 1,-1, 0, 0, 1, 1,-1,-1, 1,-1, 0, 0, 0, 1,-1, 0, 0, 0, 0, 0, 0, 1,-1
+    };
+    std::array<int8_t,24> lut_jj{
+        0, 0, 0, 1,-1, 1,-1, 1,-1, 0, 0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 0, 0, 0
+    };
+    std::array<int8_t,24> lut_tt{
+        0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1
+    };
+    std::array<int8_t,24> lut_mode {
+        0,19,19,14,14, 0, 0, 0, 0,14,14,19,19, 0,14,14, 0,14,14,19,19, 0,19,19
+    };
+
+    int base = std::max(nx, ny);
+    base = base | 1; // round up to the nearest odd number
+    int height = nt;
+
+    int32_t tileParam = 1;
+    while (pow2(tileParam+1) < base + height - 1) {
+        tileParam++;
+    }
+    assert(pow2(tileParam+1) >= base + height - 1);
+    //cerr << "tileParam: " << tileParam << endl;
+
+    int32_t sx = - base / 2;
+    //cerr << "sx: " << sx << endl;
+    int32_t ex = sx + nx - 1;
+    //cerr << "ex: " << ex << endl;
+
+    int32_t sy = - base / 2;
+    //cerr << "sy: " << sy << endl;
+    int32_t ey = sy + ny - 1;
+    //cerr << "ey: " << ey << endl;
+
+    int32_t st = + base / 2;
+    //cerr << "st: " << st << endl;
+    int32_t et = st + nt - 1;
+    //cerr << "et: " << et << endl;
+
+    // size of array is the logarithm of desired tile size
+    std::vector<int8_t> state(tileParam);
+
+    // height of the tile depends on the number of iterations:
+    // num of iterations: 2^{3i+1}-2^i
+    // i from 1 to inf
+    // height big: 2^{i+1} ( range: [0;2^{i+1}-1] )
+    // height small: 2^i ( range: [0;2^i-1] )
+    // width: 2^{i+1} - 1 ( range: [-(2^i - 1); +(2^i - 1)] )
+    int64_t iterations = pow2(3ll * tileParam + 1ll) - pow2(tileParam);
+    //iterations = 20;
+    //cerr << "iterations: " << iterations << endl;
+
+    std::vector<int32_t> tts(tileParam + 1);
+    std::vector<int32_t> iis(tileParam + 1);
+    std::vector<int32_t> jjs(tileParam + 1);
+
+    size_t K = state.size() - 1;
+
+    bool finished = false;
+    while (1) {
+
+        //cerr << "=====" << endl;
+        // step
+
+        //for (int i = 0; i < state.size(); i++) {
+        //    cerr << int(state[i]) << " ";
+        //}
+        //cerr << endl;
+
+        bool skipTile = false;
+        while (1) {
+            int32_t ss = state[K];
+
+            int32_t tt = lut_tt[ss];
+            int32_t ii = lut_ii[ss];
+            int32_t jj = lut_jj[ss];
+
+            tts[K] = tts[K+1] + (tt << K);
+            iis[K] = iis[K+1] + (ii << K);
+            jjs[K] = jjs[K+1] + (jj << K);
+
+            int32_t min_t = tts[K] + 0;
+            int32_t min_x = iis[K] - (pow2(K + 1) - 1);
+            int32_t min_y = jjs[K] - (pow2(K + 1) - 1);
+
+            int32_t mode = lut_mode[ss];
+            int32_t height = pow2(K + (mode == 0 ? 2 : 1)) - 1;
+
+            int32_t max_t = tts[K] + height - 1;
+            int32_t max_x = iis[K] + (pow2(K + 1) - 1);
+            int32_t max_y = jjs[K] + (pow2(K + 1) - 1);
+
+            //cerr
+            //    << min_x << " "
+            //    << max_x << " "
+            //    << min_y << " "
+            //    << max_y << " "
+            //    << min_t << " "
+            //    << max_t << " "
+            //    << endl;
+
+            if (max_t < st || min_t > et ||
+                max_x < sx || min_x > ex ||
+                max_y < sy || min_y > ey)
+            {
+                skipTile = true;
+                break;
+            }
+
+            if (K == 0) break;
+
+            state[K-1] = lut_mode[state[K]];
+
+            K--;
+        };
+
+        //cerr << "skipTile: " << skipTile << endl;
+        //cerr << "ijt: " << iis[0] << " " << jjs[0] << " " << tts[0] << endl;
+
+        if (!skipTile) {
+
+            // print
+            if (sx <= iis[0] && iis[0] <= ex &&
+                sy <= jjs[0] && jjs[0] <= ey) {
+                if (st <= tts[0] && tts[0] <= et) {
+                    func(iis[0] - sx, jjs[0] - sy, tts[0] - st);
+                }
+                if (lut_mode[state[0]] == 0) {
+                    if(st <= tts[0] + 1 && tts[0] + 1 <= et) {
+                        func(iis[0] - sx, jjs[0] - sy, tts[0] + 1 - st);
+                    }
+                }
+            }
+
+        }
+
+        while (state[K] == 13 || state[K] == 18 || state[K] == 23) {
+            K++;
+            if (K == state.size()) { finished = true; break; }
+        }
+        if (finished == true) break;
+
+        state[K]++;
+
+
+    }
+
+}
+
+template <typename F>
+void classicLoops(int nx, int ny, int nt, F func) {
+    for (int t = 0; t < nt; t++)
+        for (int j = 0; j < ny; j++)
+            for (int i = 0; i < nx; i++)
+                func(i, j, t);
+}
+
+
+//classicLoops - 26.22(Vladislav)
+//tiledLoopsTemplated - 25.57(Vladislav)
+
+//***************End of tiling methods*****************//
+
 void extend_ghost(Var a, Int gh, Int gnx, Int gny) {
     for (Int i = 0; i < gh; i++) {
         a.x(i,i+1) = + a.x(gh,gh+1);
@@ -38,6 +387,7 @@ inline Expr advection(Expr c, Expr ppu, Expr pu, Expr u, Expr nu, Expr nnu) {
 
     return - c * (nf12 - pf12);
 }
+
 
 int main(int argc, char** argv) {
 #ifndef NDEBUG
@@ -156,27 +506,38 @@ int main(int argc, char** argv) {
         Temp dw1, dw2, dw3, dw4;
 
         DefineLoop([&](int nx, int ny){
-            for(Int _j = 0; _j < ny; _j++) {
-                for(Int _i = 0; _i < nx; _i++) {
-                    LoopSequence(0).init(_i, _j);
+            Int xx = (nx / 4);
+            Int yy = (ny / 2);
+            Int tt = (time_steps * 4);
+            tiledLoopsTemplated(xx, yy, tt,
+                       [&](int i, int j, int t) __attribute__((always_inline)) {
+                switch(t % 4) {
+                case 0:
+                {
+                    initLoopSequence(0, 4, 4*i, 2*j);
+                    initLoopSequence(0, 4, 4*i, 2*j+1);
+                    break;
                 }
-            }
-            for(Int _j = 0; _j < ny; _j++) {
-                for(Int _i = 0; _i < nx; _i++) {
-                    LoopSequence(1).init(_i, _j);
+                case 1:
+                {
+                    initLoopSequence(1, 4, 4*i, 2*j+1);
+                    initLoopSequence(1, 4, 4*i, 2*j+1);
+                    break;
                 }
-            }
-            for(Int _j = 0; _j < ny; _j++) {
-                for(Int _i = 0; _i < nx; _i++) {
-                    LoopSequence(2).init(_i, _j);
+                case 2:
+                {
+                    initLoopSequence(2, 4, 4*i, 2*j+1);
+                    initLoopSequence(2, 4, 4*i, 2*j+1);
+                    break;
                 }
-            }
-            for(Int _j = 0; _j < ny; _j++) {
-                for(Int _i = 0; _i <nx; _i++) {
-                    LoopSequence(3).init(_i, _j);
+                case 3:
+                {
+                    initLoopSequence(3, 4, 4*i, 2*j+1);
+                    initLoopSequence(3, 4, 4*i, 2*j+1);
+                    break;
                 }
-            }
-
+                }
+            });
         })+
         [&]() { // to_omega_x
                     w1i = + vxi * icpi + sxxi * ilmi,

@@ -19,6 +19,7 @@
 #include "vectorclass.h"
 #include "immintrin.h"
 
+
 using Int = int64_t;
 using Real = double;
 
@@ -40,6 +41,7 @@ void check(const std::string& msg, bool expr) {
 
 #define CHECK2(expr, msg) \
     SoverHelperImpl::check(msg, expr)
+
 
 struct Size {
     explicit Size(Int x, Int y) : x(x), y(y) {}
@@ -377,10 +379,13 @@ public:
 
 class LoopSequence {
 public:
-    LoopSequence(int) {}
-    LoopSequence init(int, int) {return *this;}
+    LoopSequence() {}
 };
 
+//************************(lambaNum, vecN, i, j)***
+LoopSequence initLoopSequence(int, int, int, int) {
+    return LoopSequence();
+}
 
 Real4 operator+(const Real4& lhs, const Real4& rhs) {
     return Real4(lhs.val + rhs.val);
