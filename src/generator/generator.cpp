@@ -129,13 +129,12 @@ public:
         {
             LambdaExpr* lambdaExpr = cast<LambdaExpr>(e);
 
-            SourceLocation beginLambda = lambdaExpr->getBeginLoc();
-            SourceLocation beginLambdaBody = Lexer::GetBeginningOfToken(lambdaExpr->getBody()->getLBracLoc(),
-                                                                        mRewriter.getSourceMgr(), LangOptions());
+            std::string s = Lexer::getSourceText(
+                        CharSourceRange::getTokenRange(SourceRange(lambdaExpr->getBeginLoc(), lambdaExpr->getBody()->getLBracLoc().getLocWithOffset(-1))),
+                        mRewriter.getSourceMgr(),
+                        LangOptions());
 
-            SourceLocation endLambda = lambdaExpr->getEndLoc();
-            SourceLocation endLambdaBody = Lexer::GetBeginningOfToken(lambdaExpr->getBody()->getRBracLoc(),
-                                                                      mRewriter.getSourceMgr(), LangOptions());
+            lambdaFunctions.push_back("auto loop = " + s);
             lambdaStmt.push_back(lambdaExpr->getBody());
             return true;
         } else {
@@ -166,6 +165,7 @@ public:
     std::set<std::string> temps; // each use of Temp
 
     std::vector<CompoundStmt*> lambdaStmt;
+    std::vector<std::string> lambdaFunctions;
 
     std::vector<std::string> sourceBuffer;
     bool isOnlyWriteInBuffer = false;
@@ -301,20 +301,26 @@ public:
         }
 
         // find iteration space size
-        std::string sizeXStr;
-        if(stmtIndex >= 0) {
-            sizeXStr = (Twine("Int _sizeX_") + std::to_string(stmtIndex) + " = " + temporaryName(*sv.allVars().begin())
+        std::string sizeXStr="";
+        std::string sizeYStr="";
+        switch (stmtIndex) {
+        case 0: //create sizeX sizeY one time for block of sequences
+            sizeXStr = (Twine("Int _sizeX") + " = " + temporaryName(*sv.allVars().begin())
                              + "_" + std::to_string(stmtIndex) + ".range().size().x;\n").str();
-        } else sizeXStr = (Twine("Int _sizeX") + " = " + temporaryName(*sv.allVars().begin())
-                            + ".range().size().x;\n").str();
-        mRewriter.InsertText(begin, sizeXStr, true, true);
-
-        std::string sizeYStr;
-        if(stmtIndex >= 0) {
-            sizeYStr = (Twine("Int _sizeY_") + std::to_string(stmtIndex) + " = " + temporaryName(*sv.allVars().begin())
+            sizeYStr = (Twine("Int _sizeY") + " = " + temporaryName(*sv.allVars().begin())
                              + "_" + std::to_string(stmtIndex) + ".range().size().y;\n").str();
-        } else sizeYStr = (Twine("Int _sizeY") + " = " + temporaryName(*sv.allVars().begin())
-                            + ".range().size().y;\n").str();
+            break;
+        case -1: // default state
+            sizeXStr = (Twine("Int _sizeX") + " = " + temporaryName(*sv.allVars().begin())
+                        + ".range().size().x;\n").str();
+            sizeYStr = (Twine("Int _sizeY") + " = " + temporaryName(*sv.allVars().begin())
+                        + ".range().size().y;\n").str();
+            break;
+        default: // dont create sizeX sizeY
+            break;
+        }
+
+        mRewriter.InsertText(begin, sizeXStr, true, true);
         mRewriter.InsertText(begin, sizeYStr, true, true);
 
         // add assertions
@@ -322,10 +328,8 @@ public:
             std::string ssX;
             std::string ssY;
             if(stmtIndex >= 0) {
-                    ssX = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().x == _sizeX_"
-                               + std::to_string(stmtIndex) + ");\n").str();
-                    ssY = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().y == _sizeY_"
-                                                   + std::to_string(stmtIndex) + ");\n").str();
+                    ssX = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().x == _sizeX);\n").str();
+                    ssY = (Twine("assert(") +  temporaryName(e) + "_" + std::to_string(stmtIndex) + ".range().size().y == _sizeY);\n").str();
             } else {ssX = (Twine("assert(") +  temporaryName(e) + ".range().size().x == _sizeX);\n").str();
                     ssY = (Twine("assert(") +  temporaryName(e) + ".range().size().y == _sizeY);\n").str();}
             mRewriter.InsertText(begin, ssX, true, true);
@@ -334,26 +338,9 @@ public:
 
         if(loopStmt == nullptr) {
          // add expression lambda
-        mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) __attribute__((always_inline,flatten)) {\n", true, true);
+        mRewriter.InsertText(begin, "auto _evaluate = [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {\n", true, true);
         } else {
-          std::string lambdaVar;
-          switch (stmtIndex) {
-          case 0:
-              lambdaVar = "X1";
-              break;
-          case 1:
-              lambdaVar = "X2";
-              break;
-          case 2:
-              lambdaVar = "Y1";
-              break;
-          case 3:
-              lambdaVar = "Y2";
-              break;
-          default:
-              break;
-          }
-          std::string lamdbaDecl = (Twine("auto _evaluate")+ lambdaVar +"= [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {\n").str();
+          std::string lamdbaDecl = (Twine("auto _evaluate_") + std::to_string(stmtIndex) + "= [&](Int _i, Int _j, auto type) __attribute__((always_inline)) {\n").str();
           mRewriter.InsertText(begin, lamdbaDecl, true, true);
         }
         mRewriter.InsertText(begin, "using T = decltype(type);\n", true, true);
@@ -462,31 +449,20 @@ public:
                 }
                 if(child && isa<Expr>(child) && cast<Expr>(child)->getType().getAsString() == "class LoopSequence") {
                     CXXConstructExpr* construct = findCurrentChild<CXXConstructExpr>(child);
-                    int value =  std::atoi(getText(construct->getArg(0), mRewriter).c_str());
+                    std::string loopNum =  getText(construct->getArg(0), mRewriter);
 
                     CXXMemberCallExpr* call = cast<CXXMemberCallExpr>(child);
                     if(call == nullptr) call = findCurrentChild<CXXMemberCallExpr>(child);
                     std::string i = getText(call->getArg(0), mRewriter);
                     std::string j = getText(call->getArg(1), mRewriter);
 
-                    std::string lambdaVar;
-                    switch (value) {
-                    case 0:
-                        lambdaVar = "X1";
-                        break;
-                    case 1:
-                        lambdaVar = "X2";
-                        break;
-                    case 2:
-                        lambdaVar = "Y1";
-                        break;
-                    case 3:
-                        lambdaVar = "Y2";
-                        break;
-                    default:
-                        break;
+                    std::string lambdaDecl;
+                    if(LoopsVectorization.getValue()) {
+                        lambdaDecl = (Twine("_evaluate_")+ loopNum + "(" + i + ", " + j + ", " + "Real4());").str();
+                    } else {
+                        lambdaDecl = (Twine("_evaluate_")+ loopNum + "(" + i + ", " + j + ", " + "Real());").str();
                     }
-                    std::string lambdaDecl = (Twine("_evaluate")+ lambdaVar + "(" + i + ", " + j + ", " + "Real());").str();
+
                     sourceBuffer.push_back(lambdaDecl);
                 }
             }
@@ -542,8 +518,18 @@ public:
                 stmtNum++;
             }
 
+            mRewriter.InsertText(expr->getEndLoc(), Twine(sm.lambdaFunctions.at(0) + " __attribute__((always_inline)) { \n").str(), true, true);
+
             for(auto str : loopProcessing(defineLoopStmt)) {
                 mRewriter.InsertText(expr->getEndLoc(), Twine(str + " \n").str(), true, true);
+            }
+            mRewriter.InsertText(expr->getEndLoc(), Twine("};\n").str(), true, true);
+
+            if(LoopsVectorization.getValue()) {
+                mRewriter.InsertText(expr->getEndLoc(), Twine("CHECK(_sizeX%4 == 0); \n").str(), true, true);
+                mRewriter.InsertText(expr->getEndLoc(), Twine("loop(_sizeX/4, _sizeY);\n").str(), true, true);
+            } else {
+                mRewriter.InsertText(expr->getEndLoc(), Twine("loop(_sizeX, _sizeY);\n").str(), true, true);
             }
 
             return true;

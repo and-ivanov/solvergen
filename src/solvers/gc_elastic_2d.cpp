@@ -155,31 +155,28 @@ int main(int argc, char** argv) {
         Temp c1, c2;
         Temp dw1, dw2, dw3, dw4;
 
-        DefineLoop([time_steps, size](int _sizeX_0, int _sizeY_0,
-                                      int _sizeX_1, int _sizeY_1,
-                                      int _sizeX_2, int _sizeY_2,
-                                      int _sizeX_3, int _sizeY_3){
-
-            for(Int _j = 0; _j < _sizeY_0; _j++) {
-                for(Int _i = 0; _i < _sizeX_0; _i++) {
+        DefineLoop([&](int nx, int ny){
+            for(Int _j = 0; _j < ny; _j++) {
+                for(Int _i = 0; _i < nx; _i++) {
                     LoopSequence(0).init(_i, _j);
                 }
             }
-            for(Int _j = 0; _j < _sizeY_1; _j++) {
-                for(Int _i = 0; _i < _sizeX_1; _i++) {
+            for(Int _j = 0; _j < ny; _j++) {
+                for(Int _i = 0; _i < nx; _i++) {
                     LoopSequence(1).init(_i, _j);
                 }
             }
-            for(Int _j = 0; _j < _sizeY_2; _j++) {
-                for(Int _i = 0; _i < _sizeX_2; _i++) {
+            for(Int _j = 0; _j < ny; _j++) {
+                for(Int _i = 0; _i < nx; _i++) {
                     LoopSequence(2).init(_i, _j);
                 }
             }
-            for(Int _j = 0; _j < _sizeY_3; _j++) {
-                for(Int _i = 0; _i < _sizeX_3; _i++) {
+            for(Int _j = 0; _j < ny; _j++) {
+                for(Int _i = 0; _i <nx; _i++) {
                     LoopSequence(3).init(_i, _j);
                 }
             }
+
         })+
         [&]() { // to_omega_x
                     w1i = + vxi * icpi + sxxi * ilmi,

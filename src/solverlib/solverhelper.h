@@ -365,7 +365,7 @@ struct Real4 {
 
 class DefineLoop {
 public:
-    using DefineLoopFn = std::function<void(int, int, int, int, int, int, int, int)>;
+    using DefineLoopFn = std::function<void(int, int)>;
     using rhsFn = std::function<void()>;
     DefineLoop(DefineLoopFn)  {}
     DefineLoop() {}
@@ -455,7 +455,6 @@ Real4 max(const Real4& lhs, const Real& rhs) {
 Real4 max(const Real4& lhs, const Real4& rhs) {
     return Real4(max(lhs.val, rhs.val));
 }
-
 
 
 inline void loadFromPtr(Real& l, Real* r) {
