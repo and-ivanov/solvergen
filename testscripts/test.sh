@@ -47,5 +47,5 @@ data.astype('<f8').tofile("initial_pressure.bin")
 EOF
 python gen_initial.py
 
-#/usr/bin/time -f "time: %e" ./gc_elastic_2d config.hrdata
-/usr/bin/time -f "time: %e" ./gc_elastic_2d_tiled config.hrdata
+/usr/bin/time -f "time: %e" ./gc_elastic_2d config.hrdata
+#/usr/bin/time -f "time: %e" ./gc_elastic_2d_tiled config.hrdata
